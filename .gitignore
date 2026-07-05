@@ -34,3 +34,19 @@ venv/
 # ==========================
 dist/
 build/
+
+# ==========================
+# Node / Next.js
+# ==========================
+node_modules/
+.next/
+out/
+frontend/.env.local
+
+# ==========================
+# Backend runtime data
+# ==========================
+backend/app.db
+backend/chroma_data/
+backend/uploads/*
+!backend/uploads/.gitkeep
