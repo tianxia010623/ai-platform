@@ -19,11 +19,14 @@ function HomeContent() {
   }, []);
 
   return (
-    <div className="flex h-screen bg-white">
+    <div className="flex h-screen bg-paper">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto px-8 py-8">
+      <main className="flex-1 overflow-y-auto px-8 py-10">
         <div className="mx-auto max-w-5xl">
-          <h1 className="mb-1 text-2xl font-semibold text-ink">Your Avatars</h1>
+          <p className="mb-2 font-mono text-[11px] uppercase tracking-[0.2em] text-accent2">
+            Your Cast
+          </p>
+          <h1 className="mb-1 font-display text-3xl font-semibold text-ink">Your Avatars</h1>
           <p className="mb-8 text-sm text-ink-muted">
             Create custom AI personas and chat with them to explore topics.
           </p>
@@ -31,8 +34,8 @@ function HomeContent() {
           {loading ? (
             <p className="text-sm text-ink-muted">Loading...</p>
           ) : avatars.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-gray-300 px-6 py-16 text-center">
-              <p className="mb-4 text-sm text-ink-muted">You haven&apos;t created any avatars yet.</p>
+            <div className="rounded-2xl border border-dashed border-line bg-surface px-6 py-16 text-center">
+             <p className="mb-4 text-sm text-ink-muted">You haven&apos;t created any avatars yet.</p>
               <a
                 href="/avatar/new"
                 className="inline-block rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover"

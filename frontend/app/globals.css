@@ -1,6 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --font-display: "Fraunces", serif;
+  --font-sans: "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  /* Matinee (default) */
+  --color-accent: 47 111 94;
+  --color-accent-hover: 36 89 74;
+  --color-accent-light: 227 238 234;
+  --color-accent2: 185 139 46;
+  --color-accent2-light: 245 235 214;
+  --color-ink: 20 23 31;
+  --color-ink-muted: 91 100 114;
+  --color-paper: 238 240 244;
+  --color-surface: 255 255 255;
+  --color-line: 218 223 230;
+}
+
+[data-theme="midnight"] {
+  --color-accent: 79 191 163;
+  --color-accent-hover: 61 168 141;
+  --color-accent-light: 30 59 52;
+  --color-accent2: 224 177 90;
+  --color-accent2-light: 58 47 22;
+  --color-ink: 237 239 243;
+  --color-ink-muted: 144 153 171;
+  --color-paper: 20 23 31;
+  --color-surface: 27 31 41;
+  --color-line: 43 48 60;
+}
+
+[data-theme="sepia"] {
+  --color-accent: 140 63 45;
+  --color-accent-hover: 110 47 33;
+  --color-accent-light: 241 220 210;
+  --color-accent2: 107 122 58;
+  --color-accent2-light: 231 234 211;
+  --color-ink: 43 33 24;
+  --color-ink-muted: 122 108 88;
+  --color-paper: 241 231 214;
+  --color-surface: 255 255 255;
+  --color-line: 227 214 192;
+}
 
 html,
 body {
@@ -8,8 +54,10 @@ body {
 }
 
 body {
-  background-color: #ffffff;
-  color: #1f2328;
+  background-color: rgb(var(--color-paper));
+  color: rgb(var(--color-ink));
+  font-family: var(--font-sans);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 ::-webkit-scrollbar {
@@ -18,7 +66,7 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: #d1d5db;
+  background-color: rgb(var(--color-line));
   border-radius: 9999px;
 }
 

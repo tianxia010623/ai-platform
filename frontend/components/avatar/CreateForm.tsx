@@ -60,12 +60,15 @@ export default function CreateForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mx-auto max-w-2xl space-y-6">
+    <form
+      onSubmit={handleSubmit}
+      className="mx-auto max-w-2xl space-y-6 rounded-2xl border border-line bg-surface p-8 shadow-[0_1px_2px_rgba(20,23,31,0.04),0_8px_24px_rgba(20,23,31,0.05)]"
+    >
       <div className="flex items-center gap-4">
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-gray-300 bg-gray-50 text-xs text-ink-muted hover:border-accent"
+          className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-line bg-paper text-xs text-ink-muted hover:border-accent"
         >
           {imagePreview ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -156,16 +159,18 @@ export default function CreateForm() {
       <style jsx>{`
         .input {
           width: 100%;
-          border: 1px solid #e5e7eb;
+          border: 1px solid #dadfe6;
           border-radius: 0.5rem;
           padding: 0.5rem 0.75rem;
           font-size: 0.875rem;
-          color: #1f2328;
+          color: #14171f;
+          background: #fbfbfc;
           outline: none;
         }
         .input:focus {
-          border-color: #4f46e5;
-          box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+          border-color: #2f6f5e;
+          background: #ffffff;
+          box-shadow: 0 0 0 3px rgba(47, 111, 94, 0.12);
         }
       `}</style>
     </form>
@@ -184,7 +189,7 @@ function Field({
   return (
     <label className="block">
       <span className="mb-1.5 block text-sm font-medium text-ink">
-        {label} {required && <span className="text-red-500">*</span>}
+        {label} {required && <span className="text-accent2">*</span>}
       </span>
       {children}
     </label>

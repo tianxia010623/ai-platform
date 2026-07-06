@@ -8,6 +8,7 @@ import * as api from "@/lib/api";
 import { avatarImageUrl } from "@/lib/api";
 import type { Avatar, ChatSession } from "@/lib/types";
 import { useAuth } from "@/lib/auth-context";
+import ThemeSwitcher from "@/components/ThemeSwitcher";
 
 export default function Sidebar({ activeAvatarId }: { activeAvatarId?: number }) {
   const [avatars, setAvatars] = useState<Avatar[]>([]);
@@ -31,9 +32,9 @@ export default function Sidebar({ activeAvatarId }: { activeAvatarId?: number })
   }, [activeAvatarId]);
 
   return (
-    <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-gray-200 bg-white">
-      <div className="flex items-center justify-between px-4 py-4">
-        <Link href="/" className="text-lg font-semibold text-ink">
+    <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-line bg-surface">
+      <div className="flex items-center justify-between px-4 py-5">
+        <Link href="/" className="font-display text-lg font-semibold text-ink">
           AI Avatars
         </Link>
       </div>
@@ -47,9 +48,9 @@ export default function Sidebar({ activeAvatarId }: { activeAvatarId?: number })
         </Link>
       </div>
 
-      <nav className="mt-4 flex-1 space-y-1 overflow-y-auto px-3">
-        <p className="px-1 pb-1 text-xs font-medium uppercase tracking-wide text-ink-muted">
-          Your Avatars
+      <nav className="mt-5 flex-1 space-y-1 overflow-y-auto px-3">
+        <p className="px-1 pb-2 font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-ink-muted">
+          The Cast
         </p>
         {avatars.map((avatar) => {
           const isActive = avatar.id === activeAvatarId;
@@ -60,13 +61,17 @@ export default function Sidebar({ activeAvatarId }: { activeAvatarId?: number })
               href={`/chat/${avatar.id}`}
               className={clsx(
                 "flex items-center gap-2 rounded-lg px-2 py-2 text-sm transition",
-                isActive ? "bg-accent-light text-accent font-medium" : "text-ink hover:bg-gray-100"
+                isActive ? "bg-accent-light font-medium text-accent" : "text-ink hover:bg-paper"
               )}
             >
               {img ? (
-                <img src={img} alt={avatar.name} className="h-7 w-7 rounded-full object-cover" />
+                <img
+                  src={img}
+                  alt={avatar.name}
+                  className="h-7 w-7 rounded-full object-cover ring-2 ring-surface"
+                />
               ) : (
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-light text-xs font-semibold text-accent">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-light text-xs font-semibold text-accent ring-2 ring-surface">
                   {avatar.name.slice(0, 1).toUpperCase()}
                 </span>
               )}
@@ -77,7 +82,7 @@ export default function Sidebar({ activeAvatarId }: { activeAvatarId?: number })
 
         {activeAvatarId && sessions.length > 0 && (
           <div className="mt-4">
-            <p className="px-1 pb-1 text-xs font-medium uppercase tracking-wide text-ink-muted">
+            <p className="px-1 pb-2 font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-ink-muted">
               Chat History
             </p>
             {sessions.map((s) => (
@@ -85,7 +90,7 @@ export default function Sidebar({ activeAvatarId }: { activeAvatarId?: number })
                 key={s.id}
                 href={`/chat/${activeAvatarId}?session=${s.id}`}
                 className={clsx(
-                  "block truncate rounded-lg px-2 py-1.5 text-sm text-ink-muted hover:bg-gray-100",
+                  "block truncate rounded-lg px-2 py-1.5 text-sm text-ink-muted hover:bg-paper",
                   pathname === `/chat/${activeAvatarId}` && "text-ink"
                 )}
               >
@@ -96,10 +101,11 @@ export default function Sidebar({ activeAvatarId }: { activeAvatarId?: number })
         )}
       </nav>
 
-      <div className="border-t border-gray-200 px-3 py-3">
+      <div className="border-t border-line px-3 py-3">
+        <ThemeSwitcher />
         <Link
           href="/dashboard"
-          className="mb-1 block rounded-lg px-2 py-2 text-sm text-ink hover:bg-gray-100"
+          className="mb-1 block rounded-lg px-2 py-2 text-sm text-ink hover:bg-paper"
         >
           Knowledge Dashboard
         </Link>

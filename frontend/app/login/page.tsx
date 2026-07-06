@@ -34,9 +34,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-white px-4">
-      <div className="w-full max-w-sm">
-        <h1 className="mb-1 text-center text-2xl font-semibold text-ink">AI Avatars</h1>
+    <div className="flex min-h-screen items-center justify-center bg-paper px-4">
+      <div className="w-full max-w-sm rounded-2xl border border-line bg-surface px-8 py-10 shadow-[0_1px_2px_rgba(20,23,31,0.04),0_8px_24px_rgba(20,23,31,0.06)]">
+        <p className="mb-2 text-center font-mono text-[11px] uppercase tracking-[0.2em] text-accent2">
+          Call Sheet
+        </p>
+        <h1 className="mb-1 text-center font-display text-3xl font-semibold text-ink">
+          AI Avatars
+        </h1>
         <p className="mb-8 text-center text-sm text-ink-muted">
           {mode === "login" ? "Log in to continue" : "Create an account"}
         </p>
@@ -46,7 +51,7 @@ export default function LoginPage() {
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             placeholder="Username"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+            className="w-full rounded-lg border border-line bg-paper/40 px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:bg-white focus:ring-2 focus:ring-accent/20"
           />
           {mode === "register" && (
             <input
@@ -54,7 +59,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Email"
               type="email"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+              className="w-full rounded-lg border border-line bg-paper/40 px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:bg-white focus:ring-2 focus:ring-accent/20"
             />
           )}
           <input
@@ -62,7 +67,7 @@ export default function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Password"
             type="password"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/20"
+            className="w-full rounded-lg border border-line bg-paper/40 px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:bg-white focus:ring-2 focus:ring-accent/20"
           />
 
           {error && <p className="text-sm text-red-600">{error}</p>}
