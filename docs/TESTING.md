@@ -39,3 +39,52 @@ Full local run of frontend + backend, verifying signup, login, avatar creation, 
 - [ ] Teammate to top up Anthropic account credit
 - [ ] Re-test full chat flow (including file upload) once resolved
 - [ ] Test Dashboard page
+---
+
+## Test Session 2
+
+## Date
+2026-07-13
+
+## Tester
+Liz
+
+## Scope
+Full regression test of core features: registration, avatar creation, chat, dashboard
+
+## Results
+
+| Feature | Status | Notes |
+|---|---|---|
+| Sign up | Pass | New account created and redirected correctly |
+| Create Avatar (PPdog - tsundere persona) | Pass | Persona voice matched the brief well |
+| Basic chat | Pass | Streaming response works, tone matches persona |
+| Multi-turn memory | Pass | Avatar correctly recalled earlier context (PyTorch bug mention) |
+| Theme switching | Pass | Persisted across sessions (Sepia theme remembered after re-login) |
+| Knowledge Dashboard | Fail | See Bug #3 below |
+
+## Bugs Found
+
+### Bug #3: Topic Mastery Not Tracked
+- Symptom: After multiple substantive conversation turns with an avatar (PPdog), the Knowledge Dashboard still shows "No topic mastery data yet."
+- Expected: Dashboard should reflect mastery progress based on conversation content, per the topic mastery tracking feature described in the README.
+- Possible causes: Backend mastery evaluation logic not yet implemented / not triggering after chat turns / data not persisting / frontend not reading the data correctly.
+- Status: Open, needs backend investigation
+- Impact: Medium, core chat works, but the "track how well you understand each persona's topics over time" feature is not functional
+
+## To Do
+- [ ] Investigate why topic mastery isn't being recorded/displayed
+- [ ] Test file upload functionality (PDF/image/code)
+- [ ] Test chat history persistence when switching between avatars
+- [ ] Test appearance in dark theme (Midnight) for readability issues
+
+## Additional Tests (Test Session 2 continued)
+
+| Feature | Status | Notes |
+|---|---|---|
+| File upload (PDF/image/code) | Pass | Uploads processed correctly during chat |
+| Chat history persistence across avatar switching | Pass | Conversation history retained when switching between avatars |
+| Dark theme (Midnight) display | Pass | Good contrast and readability across pages |
+
+## Test Session 2 Summary
+All core features tested pass except topic mastery tracking (Bug #3), which remains open and needs backend investigation. Overall the app is in a solid, mostly functional state for this stage of development.
