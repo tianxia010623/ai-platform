@@ -72,7 +72,8 @@ async def analyze_and_update_mastery(
         )
         text = next((b.text for b in response.content if b.type == "text"), "{}")
         parsed = json.loads(text)
-    except Exception:  # noqa: BLE001
+    except Exception as exc:  # noqa: BLE001
+        print(f"[mastery_service] analyze_and_update_mastery failed: {exc}")
         return []
 
     updated: list[TopicMastery] = []
