@@ -75,16 +75,6 @@ Full regression test of core features: registration, avatar creation, chat flow,
 - Status: Open, needs backend investigation
 - Impact: Medium, core chat works, but the "track how well you understand each persona's topics over time" feature is not functional
 
-## To Do
-- [ ] Investigate why topic mastery isn't being recorded/displayed and fix the bug
-
-## Test Session 2 Summary
-All core features tested pass except topic mastery tracking (Bug #3), which remains open and needs backend investigation. Overall the app is in a solid, mostly functional state for this stage of development.
-
-
-
-## Test Session 2 (continued): New Chat and Message History Bugs
-
 ### Bug #4: "New Chat" Button Non-Functional
 - Symptom: Clicking "New Chat" in the sidebar highlights the button but does not create a new session or clear the current conversation. URL remains unchanged (e.g. stays at /chat/3?session=5).
 - Expected: Should create a fresh chat session with empty history.
@@ -97,3 +87,10 @@ All core features tested pass except topic mastery tracking (Bug #3), which rema
 - Status: Open, needs backend investigation into message storage/retrieval logic
 - Impact: High, this session is now completely unusable; likely caused by an edge case during message saving (possibly related to file upload or an interrupted stream)
 - Related: Compounded by Bug #4, since users cannot escape the broken session by starting a new chat
+
+
+## To Do
+- [ ] Further investigate why topic mastery isn't being recorded/displayed and fix the bug.
+
+## Test Session 2 Summary
+All core features tested pass except topic mastery tracking (Bug #3), which remains open and needs backend investigation. Overall the app is in a solid, mostly functional state for this stage of development.
