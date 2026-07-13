@@ -82,3 +82,18 @@ Full regression test of core features: registration, avatar creation, chat flow,
 All core features tested pass except topic mastery tracking (Bug #3), which remains open and needs backend investigation. Overall the app is in a solid, mostly functional state for this stage of development.
 
 
+
+## Test Session 2 (continued): New Chat and Message History Bugs
+
+### Bug #4: "New Chat" Button Non-Functional
+- Symptom: Clicking "New Chat" in the sidebar highlights the button but does not create a new session or clear the current conversation. URL remains unchanged (e.g. stays at /chat/3?session=5).
+- Expected: Should create a fresh chat session with empty history.
+- Status: Open, needs frontend/backend investigation (session creation logic)
+- Impact: Medium, blocks users from starting a clean conversation, especially relevant when a session is corrupted (see Bug #5)
+
+### Bug #5: Corrupted Session Blocks All Further Messages
+- Symptom: In one specific chat session (avatar_id=3, session=5), every new message triggers: Error code 400, invalid_request_error, "messages.32: user messages must have non-empty content"
+- Cause (suspected): An empty-content message exists somewhere in this session's history, and it gets included in every subsequent request to the Anthropic API, causing the whole request to fail.
+- Status: Open, needs backend investigation into message storage/retrieval logic
+- Impact: High, this session is now completely unusable; likely caused by an edge case during message saving (possibly related to file upload or an interrupted stream)
+- Related: Compounded by Bug #4, since users cannot escape the broken session by starting a new chat
