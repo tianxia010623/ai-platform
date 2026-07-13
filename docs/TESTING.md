@@ -38,9 +38,8 @@ Full local run of frontend + backend, verifying signup, login, avatar creation, 
 - **Impact**: Core chat feature cannot currently be verified; highest-priority blocker
 
 ## To Do
-- [✅] Teammate to top up Anthropic account credit
-- [✅] Re-test full chat flow (including file upload) once resolved
-- [✅] Test Dashboard page
+- [ ] Re-test full chat flow (including file upload) once resolved
+- [ ] Test Dashboard page
 ---
 
 ## Test Session 2
@@ -62,11 +61,9 @@ Full regression test of core features: registration, avatar creation, chat flow,
 | Create Avatar (PPdog - tsundere persona) | Pass | Persona voice matched the brief well |
 | Basic chat | Pass | Streaming response works, tone matches persona |
 | Multi-turn memory | Pass | Avatar correctly recalled earlier context (PyTorch bug mention) |
-| File upload (PDF/image/code(tsconfig.json)) | Pass | Uploads processed correctly during chat |
-| Chat history persistence across avatar switching | Pass | Conversation history retained when switching 
-|between avatars |
-| Theme switching | Pass | Persisted across sessions (Sepia theme remembered after re-login) and good
-|contrast and readability across pages |
+| File upload (PDF/image/code) | Pass | Tested with tsconfig.json; uploads processed correctly during chat |
+| Chat history persistence across avatar switching | Pass | Conversation history retained when switching between avatars |
+| Theme switching | Pass | Persisted across sessions (Sepia remembered after re-login); good contrast and readability in dark theme (Midnight) |
 | Knowledge Dashboard | Fail | See Bug #3 below |
 
 ## Bugs Found
@@ -79,10 +76,7 @@ Full regression test of core features: registration, avatar creation, chat flow,
 - Impact: Medium, core chat works, but the "track how well you understand each persona's topics over time" feature is not functional
 
 ## To Do
-- [ ] Investigate why topic mastery isn't being recorded/displayed
-- [ ] Test file upload functionality (PDF/image/code)
-- [ ] Test chat history persistence when switching between avatars
-- [ ] Test appearance in dark theme (Midnight) for readability issues
+- [ ] Investigate why topic mastery isn't being recorded/displayed and fix the bug
 
 ## Test Session 2 Summary
 All core features tested pass except topic mastery tracking (Bug #3), which remains open and needs backend investigation. Overall the app is in a solid, mostly functional state for this stage of development.
