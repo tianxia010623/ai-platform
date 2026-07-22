@@ -1,5 +1,3 @@
-import json
-
 from anthropic import AsyncAnthropic
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -67,11 +65,18 @@ async def analyze_and_update_mastery(
         response = await client.messages.create(
             model=settings.anthropic_model,
             max_tokens=1024,
-            output_config={"format": {"type": "json_schema", "schema": MASTERY_SCHEMA}},
+            tools=[
+                {
+                    "name": "record_topic_mastery",
+                    "description": "Record the topics touched on in this exchange and the user's demonstrated mastery of each.",
+                    "input_schema": MASTERY_SCHEMA,
+                }
+            ],
+            tool_choice={"type": "tool", "name": "record_topic_mastery"},
             messages=[{"role": "user", "content": analysis_prompt}],
         )
-        text = next((b.text for b in response.content if b.type == "text"), "{}")
-        parsed = json.loads(text)
+        tool_use = next((b for b in response.content if b.type == "tool_use"), None)
+        parsed = tool_use.input if tool_use else {}
     except Exception as exc:  # noqa: BLE001
         print(f"[mastery_service] analyze_and_update_mastery failed: {exc}")
         return []

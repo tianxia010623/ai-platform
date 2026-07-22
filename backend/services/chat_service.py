@@ -81,12 +81,15 @@ async def stream_chat_response(
     assistant message, then run knowledge tracking. Yields SSE-formatted strings."""
 
     history = await get_messages(db, session.id)
-    api_messages = [{"role": m.role, "content": m.content} for m in history]
+    api_messages = [
+        {"role": m.role, "content": m.content} for m in history if m.content
+    ]
 
     user_content = _build_user_content(user_text, files)
     api_messages.append({"role": "user", "content": user_content})
 
-    await save_message(db, session.id, "user", user_text, attached_files_meta)
+    stored_user_text = user_text or "(see attached file)"
+    await save_message(db, session.id, "user", stored_user_text, attached_files_meta)
 
     assistant_text_parts: list[str] = []
     try:

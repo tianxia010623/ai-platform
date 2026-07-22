@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import clsx from "clsx";
 import * as api from "@/lib/api";
 import { avatarImageUrl } from "@/lib/api";
@@ -13,7 +13,9 @@ import ThemeSwitcher from "@/components/ThemeSwitcher";
 export default function Sidebar({ activeAvatarId }: { activeAvatarId?: number }) {
   const [avatars, setAvatars] = useState<Avatar[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [creatingSession, setCreatingSession] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
   const { logout, user } = useAuth();
 
   useEffect(() => {
@@ -30,6 +32,18 @@ export default function Sidebar({ activeAvatarId }: { activeAvatarId?: number })
       setSessions([]);
     }
   }, [activeAvatarId]);
+
+  async function handleNewChat() {
+    if (!activeAvatarId || creatingSession) return;
+    setCreatingSession(true);
+    try {
+      const created = await api.createSession(activeAvatarId);
+      setSessions((prev) => [created, ...prev]);
+      router.push(`/chat/${activeAvatarId}?session=${created.id}`);
+    } finally {
+      setCreatingSession(false);
+    }
+  }
 
   return (
     <aside className="flex h-screen w-64 shrink-0 flex-col border-r border-line bg-surface">
@@ -80,11 +94,20 @@ export default function Sidebar({ activeAvatarId }: { activeAvatarId?: number })
           );
         })}
 
-        {activeAvatarId && sessions.length > 0 && (
+        {activeAvatarId && (
           <div className="mt-4">
-            <p className="px-1 pb-2 font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-ink-muted">
-              Chat History
-            </p>
+            <div className="flex items-center justify-between px-1 pb-2">
+              <p className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-ink-muted">
+                Chat History
+              </p>
+              <button
+                onClick={handleNewChat}
+                disabled={creatingSession}
+                className="font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-accent hover:text-accent-hover disabled:opacity-50"
+              >
+                + New Chat
+              </button>
+            </div>
             {sessions.map((s) => (
               <Link
                 key={s.id}

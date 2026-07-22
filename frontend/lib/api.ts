@@ -30,7 +30,19 @@ class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+function handleSessionExpired() {
+  clearToken();
+  localStorage.removeItem("ai_avatar_user");
+  if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+    window.location.href = "/login";
+  }
+}
+
+async function request<T>(
+  path: string,
+  options: RequestInit = {},
+  { skipAuthRedirect = false }: { skipAuthRedirect?: boolean } = {}
+): Promise<T> {
   const token = getToken();
   const headers = new Headers(options.headers);
   if (token) headers.set("Authorization", `Bearer ${token}`);
@@ -47,6 +59,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     } catch {
       // ignore
     }
+    if (res.status === 401 && token && !skipAuthRedirect) {
+      handleSessionExpired();
+      // Navigation is in flight; don't let callers race it with an error UI.
+      return new Promise<T>(() => {});
+    }
     throw new ApiError(res.status, detail);
   }
   if (res.status === 204) return undefined as T;
@@ -55,17 +72,19 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 // ---------- Auth ----------
 export async function register(username: string, email: string, password: string) {
-  return request<{ access_token: string; user: User }>("/api/auth/register", {
-    method: "POST",
-    body: JSON.stringify({ username, email, password }),
-  });
+  return request<{ access_token: string; user: User }>(
+    "/api/auth/register",
+    { method: "POST", body: JSON.stringify({ username, email, password }) },
+    { skipAuthRedirect: true }
+  );
 }
 
 export async function login(username: string, password: string) {
-  return request<{ access_token: string; user: User }>("/api/auth/login", {
-    method: "POST",
-    body: JSON.stringify({ username, password }),
-  });
+  return request<{ access_token: string; user: User }>(
+    "/api/auth/login",
+    { method: "POST", body: JSON.stringify({ username, password }) },
+    { skipAuthRedirect: true }
+  );
 }
 
 // ---------- Avatars ----------
