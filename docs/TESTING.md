@@ -94,3 +94,30 @@ Full regression test of core features: registration, avatar creation, chat flow,
 
 ## Test Session 2 Summary
 All core features tested pass except topic mastery tracking (Bug #3), which remains open and needs backend investigation. Overall the app is in a solid, mostly functional state for this stage of development.
+## Test Session 3: Post-Bugfix Regression + New Finding
+
+### Date
+2026-07-22
+
+### Scope
+Regression check after teammate's bug fixes (Bug #3, #4, #5), plus new registration flow test
+
+### Bug #6: Registration Error Displays "[object Object]" Instead of Actual Message
+- Symptom: When registration fails validation (e.g. password too short), the frontend displays the literal text "[object Object]" instead of a readable error message.
+- Cause: The frontend is rendering the raw error object returned by the backend (a 422 Unprocessable Content response) directly as a string, instead of extracting and displaying the actual validation message (e.g. "password must be at least X characters").
+- Reproduction: Try to sign up with a short password (e.g. 4 characters); registration fails but the error shown is unhelpful.
+- Status: Open
+- Impact: Medium, users have no way to understand why their registration failed, leading to confusion and repeated failed attempts
+
+### Bug #7: Chat Sessions Not Auto-Titled, Making History Indistinguishable
+- Symptom: All chat sessions in the sidebar history are labeled generically as "New Chat" (e.g. two entries both showing "New Chat"), even after real conversations have taken place. There is no way to tell them apart.
+- Expected: Similar to ChatGPT-style apps, each session should be auto-titled based on its first message/content once a conversation starts (e.g. "PyTorch bug troubleshooting").
+- Related observation: Clicking "New Chat" while already in an empty new session produces no visible change; this may be intentional (no content to save yet), but it is hard to confirm without proper session titles to distinguish state.
+- Status: Open
+- Impact: Medium, chat history becomes unusable at scale since users cannot identify past conversations by name
+
+## Product Discussion: Knowledge Dashboard / Topic Mastery Feature
+
+After team discussion, we agreed this feature does not fit naturally with the product's actual use case. Users are having casual/roleplay conversations with personas (including entertainment-oriented ones like tsundere characters), and being "graded" on topic mastery feels disconnected from that experience.
+
+Decision: This feature will be adjusted/redesigned in a future iteration, rather than treated as a bug fix.
