@@ -16,7 +16,7 @@ class Base(DeclarativeBase):
 
 async def init_db() -> None:
     # Import models so they are registered on Base.metadata before create_all
-    from models import avatar, chat_session, message, topic_mastery, user  # noqa: F401
+    from models import avatar, chat_session, message, message_feedback, topic_mastery, user  # noqa: F401
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

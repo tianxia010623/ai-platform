@@ -19,3 +19,4 @@ class Message(Base):
     )
 
     session: Mapped["ChatSession"] = relationship(back_populates="messages")
+    feedback: Mapped[list["MessageFeedback"]] = relationship(back_populates="message")

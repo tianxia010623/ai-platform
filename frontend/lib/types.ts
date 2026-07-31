@@ -45,3 +45,11 @@ export interface TopicMastery {
   last_topics_summary: string;
   updated_at: string;
 }
+
+export interface MessageFeedback {
+  id: number;
+  message_id: number;
+  user_id: number;
+  rating: number;
+  created_at: string;
+}

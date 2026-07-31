@@ -108,3 +108,19 @@ class TopicMasteryOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ---------- Feedback ----------
+class MessageFeedbackCreate(BaseModel):
+    rating: int = Field(ge=-1, le=1)
+
+
+class MessageFeedbackOut(BaseModel):
+    id: int
+    message_id: int
+    user_id: int
+    rating: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

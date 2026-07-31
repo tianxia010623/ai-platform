@@ -4,13 +4,15 @@ import { useEffect, useRef } from "react";
 import clsx from "clsx";
 import type { Avatar } from "@/lib/types";
 import { avatarImageUrl } from "@/lib/api";
-
+import { submitFeedback } from "@/lib/api";
+import { useState } from "react";
 export interface DisplayMessage {
   id: number | string;
   role: "user" | "assistant";
   content: string;
   attachedFiles?: { filename: string }[];
   streaming?: boolean;
+  feedback?: number | null;
 }
 
 export default function MessageList({
@@ -22,7 +24,20 @@ export default function MessageList({
 }) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const img = avatarImageUrl(avatar);
+  const [feedbackMap, setFeedbackMap] = useState<Record<string, number>>({});
 
+  async function handleFeedback(messageId: number | string, rating: number) {
+    if (typeof messageId !== "number") return;
+    const current = feedbackMap[messageId];
+    const next = current === rating ? 0 : rating;
+    setFeedbackMap((prev) => ({ ...prev, [messageId]: next }));
+    try {
+      await submitFeedback(messageId, next);
+    } catch {
+      // revert on failure
+      setFeedbackMap((prev) => ({ ...prev, [messageId]: current ?? 0 }));
+    }
+  }
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -85,6 +100,28 @@ export default function MessageList({
             )}
             {m.content}
             {m.streaming && <span className="ml-0.5 inline-block animate-pulse">▍</span>}
+            {m.role === "assistant" && !m.streaming && typeof m.id === "number" && (
+              <div className="mt-1.5 flex gap-1.5">
+                <button
+                  onClick={() => handleFeedback(m.id, 1)}
+                  className={clsx(
+                    "rounded px-1.5 py-0.5 text-xs transition",
+                    feedbackMap[m.id] === 1 ? "bg-accent text-white" : "text-ink-muted hover:bg-white"
+                  )}
+                >
+                  👍
+                </button>
+                <button
+                  onClick={() => handleFeedback(m.id, -1)}
+                  className={clsx(
+                    "rounded px-1.5 py-0.5 text-xs transition",
+                    feedbackMap[m.id] === -1 ? "bg-accent text-white" : "text-ink-muted hover:bg-white"
+                  )}
+                >
+                  👎
+                </button>
+              </div>
+            )}
           </div>
         </div>
       ))}

@@ -121,3 +121,46 @@ Regression check after teammate's bug fixes (Bug #3, #4, #5), plus new registrat
 After team discussion, we agreed this feature does not fit naturally with the product's actual use case. Users are having casual/roleplay conversations with personas (including entertainment-oriented ones like tsundere characters), and being "graded" on topic mastery feels disconnected from that experience.
 
 Decision: This feature will be adjusted/redesigned in a future iteration, rather than treated as a bug fix.
+
+## Test Session 4: Feedback Infrastructure Implementation
+
+### Date
+2026-07-31
+
+### Scope
+Built the foundation for feedback-driven prompt optimization (in lieu of true RL fine-tuning, since the project uses the closed-source Claude API rather than a self-hosted/trainable model).
+
+### Rationale
+Since Claude is accessed via API and cannot be fine-tuned directly by the team, "reinforcement learning" for this project is reframed as a feedback-driven prompt optimization loop:
+1. Collect user feedback (thumbs up/down) on AI responses
+2. (Next) Maintain multiple system prompt variants per persona
+3. (Next) Dynamically favor better-performing variants based on feedback data (A/B testing, potentially evolving into a multi-armed bandit approach)
+
+### What Was Built
+
+**Backend:**
+- New model `MessageFeedback` (models/message_feedback.py): stores message_id, user_id, rating (-1/1), with a unique constraint per (message_id, user_id) enabling upsert behavior
+- New service `feedback_service.submit_feedback()`: creates or updates a feedback record
+- New route `POST /api/feedback/{message_id}` (api/routes/feedback.py), registered in main.py
+- New schemas `MessageFeedbackCreate` / `MessageFeedbackOut`
+
+**Frontend:**
+- New type `MessageFeedback` in lib/types.ts
+- New API call `submitFeedback()` in lib/api.ts
+- Updated `MessageList.tsx`: added thumbs up/down buttons under each assistant message, with local state tracking and optimistic UI update (reverts on request failure)
+
+### Verification
+- Confirmed `message_feedback` table created via `sqlite3 app.db ".tables"`
+- Confirmed new endpoint appears in `/docs` (Swagger UI)
+- End-to-end test: clicked feedback buttons in the UI, confirmed records were correctly written to the database via direct SQL query
+
+### Status
+Feedback collection infrastructure: Complete
+Prompt variant system: Not yet started
+Dynamic selection algorithm: Not yet started
+
+### Next Steps
+- [ ] Discuss and confirm this direction with teammate
+- [ ] Design PromptVariant data model (per-avatar, multiple prompt versions)
+- [ ] Design variant selection logic (start simple: track win-rate per variant; consider bandit algorithm later)
+- [ ] Decide whether feedback should also apply to mastery scoring accuracy, per earlier discussion

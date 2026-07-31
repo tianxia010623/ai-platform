@@ -185,3 +185,11 @@ export async function streamChat(
     }
   }
 }
+
+// ---------- Feedback ----------
+export async function submitFeedback(messageId: number, rating: number) {
+  return request<{ id: number; message_id: number; rating: number }>(
+    `/api/feedback/${messageId}`,
+    { method: "POST", body: JSON.stringify({ rating }) }
+  );
+}
