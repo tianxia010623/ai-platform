@@ -5,12 +5,31 @@ from models.avatar import Avatar
 from models.chat_session import ChatSession
 from models.message import Message
 from models.message_feedback import MessageFeedback
+from models.prompt_variant import PromptVariant
+from services import bandit_service
+
+
+async def _get_variant_for_message(db: AsyncSession, message_id: int) -> PromptVariant | None:
+    result = await db.execute(
+        select(PromptVariant)
+        .join(Message, Message.prompt_variant_id == PromptVariant.id)
+        .where(Message.id == message_id)
+    )
+    return result.scalar_one_or_none()
 
 
 async def submit_feedback(
     db: AsyncSession, user_id: int, message_id: int, rating: int
 ) -> MessageFeedback:
-    """Create or update a user's feedback rating for a given message (upsert)."""
+    """Create or update a user's feedback rating for a given message (upsert).
+
+    If the message was generated with a prompt variant, this also feeds the
+    rating into that variant's Thompson Sampling stats (see bandit_service):
+    thumbs up = success, thumbs down = failure. Because feedback is an
+    upsert, changing an existing rating first reverts the old reward before
+    applying the new one, so a variant's stats always reflect the user's
+    latest opinion rather than double-counting.
+    """
     result = await db.execute(
         select(MessageFeedback).where(
             MessageFeedback.message_id == message_id,
@@ -18,15 +37,24 @@ async def submit_feedback(
         )
     )
     record = result.scalar_one_or_none()
+    variant = await _get_variant_for_message(db, message_id)
 
     if record is None:
         record = MessageFeedback(message_id=message_id, user_id=user_id, rating=rating)
         db.add(record)
-    else:
+        await db.commit()
+        await db.refresh(record)
+        if variant:
+            await bandit_service.apply_reward(db, variant, reward=1 if rating == 1 else 0)
+    elif record.rating != rating:
+        if variant:
+            await bandit_service.revert_reward(db, variant, reward=1 if record.rating == 1 else 0)
         record.rating = rating
+        await db.commit()
+        await db.refresh(record)
+        if variant:
+            await bandit_service.apply_reward(db, variant, reward=1 if rating == 1 else 0)
 
-    await db.commit()
-    await db.refresh(record)
     return record
 
 

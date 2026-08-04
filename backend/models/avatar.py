@@ -32,3 +32,6 @@ class Avatar(Base):
     topic_masteries: Mapped[list["TopicMastery"]] = relationship(
         back_populates="avatar", cascade="all, delete-orphan"
     )
+    prompt_variants: Mapped[list["PromptVariant"]] = relationship(
+        back_populates="avatar", cascade="all, delete-orphan"
+    )

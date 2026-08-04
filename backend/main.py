@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routes import auth, avatars, chat, feedback, mastery
+from api.routes import auth, avatars, chat, feedback, mastery, prompt_variants
 from core.config import settings
 from core.database import init_db
 
@@ -29,6 +29,7 @@ app.include_router(avatars.router)
 app.include_router(chat.router)
 app.include_router(mastery.router)
 app.include_router(feedback.router)
+app.include_router(prompt_variants.router)
 
 
 @app.get("/api/health")

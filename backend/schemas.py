@@ -90,6 +90,7 @@ class MessageOut(BaseModel):
     role: str
     content: str
     attached_files: list[dict]
+    prompt_variant_id: int | None
     created_at: datetime
 
     class Config:
@@ -133,3 +134,32 @@ class FeedbackSummaryOut(BaseModel):
     thumbs_up: int
     thumbs_down: int
     approval_rate: float | None
+
+
+# ---------- Prompt Variants (bandit) ----------
+class PromptVariantCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    prompt_modifier: str = Field(min_length=1)
+
+
+class PromptVariantUpdate(BaseModel):
+    is_active: bool
+
+
+class PromptVariantOut(BaseModel):
+    id: int
+    avatar_id: int
+    name: str
+    prompt_modifier: str
+    is_baseline: bool
+    is_active: bool
+    alpha: float
+    beta: float
+    times_shown: int
+    times_positive: int
+    times_negative: int
+    estimated_win_rate: float
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

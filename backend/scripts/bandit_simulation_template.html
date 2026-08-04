@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Prompt Variant Bandit — Simulation</title>
+<style>
+  .viz-root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --page-plane:     #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --gridline:       #e1e0d9;
+    --baseline-axis:  #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --series-1: #2a78d6; /* blue */
+    --series-2: #eb6834; /* orange */
+    --series-3: #1baf7a; /* aqua */
+    --series-4: #eda100; /* yellow */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --page-plane:     #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --gridline:       #2c2c2a;
+      --baseline-axis:  #383835;
+      --border: rgba(255,255,255,0.10);
+      --series-1: #3987e5;
+      --series-2: #d95926;
+      --series-3: #199e70;
+      --series-4: #c98500;
+    }
+  }
+  :root[data-theme="dark"] .viz-root {
+    color-scheme: dark;
+    --surface-1:      #1a1a19;
+    --page-plane:     #0d0d0d;
+    --text-primary:   #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted:     #898781;
+    --gridline:       #2c2c2a;
+    --baseline-axis:  #383835;
+    --border: rgba(255,255,255,0.10);
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--page-plane);
+    color: var(--text-primary);
+  }
+  .viz-root { max-width: 880px; margin: 0 auto; padding: 32px 24px 64px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .subtitle { color: var(--text-secondary); font-size: 14px; margin: 0 0 28px; line-height: 1.5; }
+  .theme-toggle {
+    position: fixed; top: 16px; right: 16px; font-size: 12px;
+    background: var(--surface-1); color: var(--text-secondary);
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; cursor: pointer;
+  }
+
+  .card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 20px 8px;
+    margin-bottom: 24px;
+  }
+  .card h2 { font-size: 15px; margin: 0 0 2px; }
+  .card .desc { font-size: 13px; color: var(--text-secondary); margin: 0 0 16px; line-height: 1.5; }
+
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 0 0 12px; font-size: 12px; color: var(--text-secondary); }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-swatch { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+
+  svg { display: block; width: 100%; height: auto; overflow: visible; font-family: inherit; }
+  .gridline { stroke: var(--gridline); stroke-width: 1; }
+  .axis-line { stroke: var(--baseline-axis); stroke-width: 1; }
+  .axis-label { fill: var(--text-muted); font-size: 10px; }
+  .series-line { fill: none; stroke-width: 2; }
+  .hover-dot { fill: var(--surface-1); stroke-width: 2; r: 4; }
+  .crosshair { stroke: var(--text-muted); stroke-width: 1; stroke-dasharray: 3 3; opacity: 0; }
+
+  .tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    opacity: 0;
+    transform: translate(-50%, -110%);
+    white-space: nowrap;
+    z-index: 10;
+  }
+  .tooltip .t-title { color: var(--text-muted); font-size: 11px; margin-bottom: 4px; }
+  .tooltip .t-row { display: flex; align-items: center; gap: 6px; }
+  .tooltip .t-swatch { width: 8px; height: 8px; border-radius: 2px; }
+  .tooltip .t-val { margin-left: auto; font-variant-numeric: tabular-nums; padding-left: 12px; }
+
+  .chart-wrap { position: relative; }
+
+  details.table-view { margin-top: 4px; }
+  details.table-view summary { cursor: pointer; font-size: 12px; color: var(--text-secondary); padding: 8px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 16px; }
+  th, td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--gridline); font-variant-numeric: tabular-nums; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--text-muted); font-weight: 500; }
+
+  .stat-row { display: flex; gap: 12px; flex-wrap: wrap; margin: 16px 0 24px; }
+  .stat-tile {
+    flex: 1 1 160px;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .stat-tile .label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+  .stat-tile .value { font-size: 20px; font-weight: 600; }
+  .stat-tile .sub { font-size: 11px; color: var(--text-secondary); margin-top: 2px; }
+</style>
+</head>
+<body>
+  <button class="theme-toggle" id="themeToggle" type="button">Toggle dark mode</button>
+  <div class="viz-root">
+    <h1>Prompt variant bandit — simulated convergence</h1>
+    <p class="subtitle">
+      Real feedback volume is too small right now to show this on live traffic,
+      so this is a simulation: 4 synthetic prompt variants with fixed (hidden-from-the-algorithm)
+      true win rates, run for <span id="roundsLabel"></span> rounds and averaged over
+      <span id="trialsLabel"></span> independent trials so the curves show the algorithm's
+      actual behavior rather than one run's luck. It shows what Thompson Sampling does with
+      the same kind of feedback a real avatar would generate — pick winners faster than a
+      coin flip, without a fixed A/B split.
+    </p>
+
+    <div id="statTiles" class="stat-row"></div>
+
+    <div class="card">
+      <h2>Cumulative regret</h2>
+      <p class="desc">
+        Regret = how much win-rate was left on the table each round versus always
+        picking the best variant. Lower and flatter is better. Random selection keeps
+        accumulating regret at a constant rate forever; Thompson Sampling's curve bends
+        toward flat as it learns which variant is best.
+      </p>
+      <div class="legend" id="legendRegret"></div>
+      <div class="chart-wrap">
+        <svg id="chartRegret" viewBox="0 0 800 260" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="tooltip" id="tooltipRegret"></div>
+      </div>
+      <details class="table-view">
+        <summary>View as table (every 40th round)</summary>
+        <div id="tableRegretWrap"></div>
+      </details>
+    </div>
+
+    <div class="card">
+      <h2>Selection share over time (Thompson Sampling)</h2>
+      <p class="desc">
+        Share of impressions each variant has received, cumulatively, round by round.
+        Starts near an even split (the prior has no opinion yet) and converges toward
+        favoring the best-performing variant as feedback accumulates.
+      </p>
+      <div class="legend" id="legendShare"></div>
+      <div class="chart-wrap">
+        <svg id="chartShare" viewBox="0 0 800 260" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="tooltip" id="tooltipShare"></div>
+      </div>
+      <details class="table-view">
+        <summary>View as table (every 40th round)</summary>
+        <div id="tableShareWrap"></div>
+      </details>
+    </div>
+  </div>
+
+<script>
+const DATA = __SIMULATION_DATA__;
+
+// ---- theme toggle (demo convenience only) ----
+const root = document.documentElement;
+document.getElementById('themeToggle').addEventListener('click', () => {
+  const current = root.getAttribute('data-theme');
+  root.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
+});
+
+document.getElementById('roundsLabel').textContent = DATA.rounds;
+document.getElementById('trialsLabel').textContent = DATA.trials;
+
+const seriesColors = ['var(--series-1)', 'var(--series-2)', 'var(--series-3)', 'var(--series-4)'];
+
+// ---- stat tiles ----
+const statTiles = document.getElementById('statTiles');
+DATA.variant_names.forEach((name, i) => {
+  const tile = document.createElement('div');
+  tile.className = 'stat-tile';
+  const isBest = DATA.final_estimated_rates[i] === Math.max(...DATA.final_estimated_rates);
+  tile.innerHTML = `
+    <div class="label">${name}${isBest ? ' — leading' : ''}</div>
+    <div class="value">${(DATA.final_estimated_rates[i] * 100).toFixed(0)}%</div>
+    <div class="sub">true rate ${(DATA.true_rates[i] * 100).toFixed(0)}% · α=${DATA.final_alphas[i]} β=${DATA.final_betas[i]}</div>
+  `;
+  statTiles.appendChild(tile);
+});
+
+// ---- generic line chart renderer ----
+function renderLineChart({ svgEl, tooltipEl, legendEl, series, yDomain, yFormat, xLabel, yLabel }) {
+  const W = 800, H = 260;
+  const margin = { top: 10, right: 16, bottom: 28, left: 40 };
+  const plotW = W - margin.left - margin.right;
+  const plotH = H - margin.top - margin.bottom;
+  const n = series[0].values.length;
+  const [yMin, yMax] = yDomain;
+
+  const xAt = (i) => margin.left + (i / (n - 1)) * plotW;
+  const yAt = (v) => margin.top + plotH - ((v - yMin) / (yMax - yMin)) * plotH;
+
+  svgEl.innerHTML = '';
+  const ns = 'http://www.w3.org/2000/svg';
+  const g = (tag, attrs) => {
+    const el = document.createElementNS(ns, tag);
+    for (const k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+  };
+
+  // gridlines (4 horizontal bands)
+  const gridSteps = 4;
+  for (let i = 0; i <= gridSteps; i++) {
+    const v = yMin + (i / gridSteps) * (yMax - yMin);
+    const y = yAt(v);
+    svgEl.appendChild(g('line', { class: 'gridline', x1: margin.left, x2: W - margin.right, y1: y, y2: y }));
+    const label = g('text', { class: 'axis-label', x: margin.left - 8, y: y + 3, 'text-anchor': 'end' });
+    label.textContent = yFormat(v);
+    svgEl.appendChild(label);
+  }
+  // x axis ticks
+  const xTicks = 5;
+  for (let i = 0; i <= xTicks; i++) {
+    const idx = Math.round((i / xTicks) * (n - 1));
+    const x = xAt(idx);
+    const label = g('text', { class: 'axis-label', x, y: H - margin.bottom + 16, 'text-anchor': 'middle' });
+    label.textContent = idx;
+    svgEl.appendChild(label);
+  }
+  svgEl.appendChild(g('line', { class: 'axis-line', x1: margin.left, x2: W - margin.right, y1: margin.top + plotH, y2: margin.top + plotH }));
+
+  // lines
+  series.forEach((s) => {
+    const d = s.values.map((v, i) => `${i === 0 ? 'M' : 'L'} ${xAt(i)} ${yAt(v)}`).join(' ');
+    svgEl.appendChild(g('path', { class: 'series-line', d, stroke: s.color }));
+  });
+
+  // hover dots (one per series)
+  const dots = series.map((s) => {
+    const dot = g('circle', { class: 'hover-dot', stroke: s.color, cx: -100, cy: -100 });
+    svgEl.appendChild(dot);
+    return dot;
+  });
+  const crosshair = g('line', { class: 'crosshair', y1: margin.top, y2: margin.top + plotH, x1: -100, x2: -100 });
+  svgEl.appendChild(crosshair);
+
+  // hit layer
+  const hit = g('rect', { x: margin.left, y: margin.top, width: plotW, height: plotH, fill: 'transparent' });
+  svgEl.appendChild(hit);
+
+  const container = svgEl.parentElement;
+  function onMove(evt) {
+    const rect = svgEl.getBoundingClientRect();
+    const px = (evt.clientX - rect.left) / rect.width * W;
+    let idx = Math.round(((px - margin.left) / plotW) * (n - 1));
+    idx = Math.max(0, Math.min(n - 1, idx));
+    const x = xAt(idx);
+    crosshair.setAttribute('x1', x);
+    crosshair.setAttribute('x2', x);
+    crosshair.setAttribute('opacity', 1);
+    let rows = '';
+    series.forEach((s, si) => {
+      dots[si].setAttribute('cx', x);
+      dots[si].setAttribute('cy', yAt(s.values[idx]));
+      rows += `<div class="t-row"><span class="t-swatch" style="background:${s.color}"></span>${s.name}<span class="t-val">${yFormat(s.values[idx])}</span></div>`;
+    });
+    tooltipEl.innerHTML = `<div class="t-title">round ${idx}</div>${rows}`;
+    const containerRect = container.getBoundingClientRect();
+    const px2 = (x / W) * containerRect.width;
+    const py2 = (yAt(series[0].values[idx]) / H) * containerRect.height;
+    tooltipEl.style.left = px2 + 'px';
+    tooltipEl.style.top = py2 + 'px';
+    tooltipEl.style.opacity = 1;
+  }
+  function onLeave() {
+    crosshair.setAttribute('opacity', 0);
+    dots.forEach((d) => { d.setAttribute('cx', -100); d.setAttribute('cy', -100); });
+    tooltipEl.style.opacity = 0;
+  }
+  hit.addEventListener('mousemove', onMove);
+  hit.addEventListener('mouseleave', onLeave);
+
+  // legend
+  legendEl.innerHTML = series.map((s) => `
+    <div class="legend-item"><span class="legend-swatch" style="background:${s.color}"></span>${s.name}</div>
+  `).join('');
+}
+
+function renderTable(wrapEl, series, step) {
+  const n = series[0].values.length;
+  let rows = '';
+  for (let i = 0; i < n; i += step) {
+    rows += `<tr><td>${i}</td>${series.map((s) => `<td>${s.values[i].toFixed(3)}</td>`).join('')}</tr>`;
+  }
+  wrapEl.innerHTML = `
+    <table>
+      <thead><tr><th>round</th>${series.map((s) => `<th>${s.name}</th>`).join('')}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+// ---- Chart 1: cumulative regret ----
+const regretSeries = [
+  { name: 'Thompson Sampling', color: seriesColors[0], values: DATA.thompson_regret },
+  { name: 'Epsilon-greedy (10%)', color: seriesColors[1], values: DATA.epsilon_greedy_regret },
+  { name: 'Random', color: seriesColors[2], values: DATA.random_regret },
+];
+const regretMax = Math.max(...regretSeries.flatMap((s) => s.values));
+renderLineChart({
+  svgEl: document.getElementById('chartRegret'),
+  tooltipEl: document.getElementById('tooltipRegret'),
+  legendEl: document.getElementById('legendRegret'),
+  series: regretSeries,
+  yDomain: [0, regretMax * 1.05],
+  yFormat: (v) => v.toFixed(0),
+});
+renderTable(document.getElementById('tableRegretWrap'), regretSeries, 40);
+
+// ---- Chart 2: selection share over time ----
+const shareSeries = DATA.variant_names.map((name, i) => ({
+  name,
+  color: seriesColors[i],
+  values: DATA.selection_share_over_time[i],
+}));
+renderLineChart({
+  svgEl: document.getElementById('chartShare'),
+  tooltipEl: document.getElementById('tooltipShare'),
+  legendEl: document.getElementById('legendShare'),
+  series: shareSeries,
+  yDomain: [0, 1],
+  yFormat: (v) => (v * 100).toFixed(0) + '%',
+});
+renderTable(document.getElementById('tableShareWrap'), shareSeries, 40);
+</script>
+</body>
+</html>

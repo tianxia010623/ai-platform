@@ -10,7 +10,8 @@ from core.config import settings
 from models.avatar import Avatar
 from models.chat_session import ChatSession
 from models.message import Message
-from services import mastery_service
+from models.prompt_variant import PromptVariant
+from services import bandit_service, mastery_service
 from services.file_service import build_content_blocks_for_file
 
 
@@ -46,10 +47,19 @@ async def get_messages(db: AsyncSession, session_id: int) -> list[Message]:
 
 
 async def save_message(
-    db: AsyncSession, session_id: int, role: str, content: str, attached_files: list[dict] | None = None
+    db: AsyncSession,
+    session_id: int,
+    role: str,
+    content: str,
+    attached_files: list[dict] | None = None,
+    prompt_variant_id: int | None = None,
 ) -> Message:
     message = Message(
-        session_id=session_id, role=role, content=content, attached_files=attached_files or []
+        session_id=session_id,
+        role=role,
+        content=content,
+        attached_files=attached_files or [],
+        prompt_variant_id=prompt_variant_id,
     )
     db.add(message)
     await db.commit()
@@ -66,6 +76,12 @@ def _build_user_content(user_text: str, files: list[tuple[Path, str]]) -> list[d
         blocks.extend(build_content_blocks_for_file(path, original_filename))
     blocks.append({"type": "text", "text": user_text or "(see attached file)"})
     return blocks
+
+
+def _build_system_prompt(avatar: Avatar, variant: PromptVariant | None) -> str:
+    if variant is None or not variant.prompt_modifier:
+        return avatar.system_prompt
+    return f"{avatar.system_prompt}\n\n{variant.prompt_modifier}"
 
 
 async def stream_chat_response(
@@ -91,12 +107,18 @@ async def stream_chat_response(
     stored_user_text = user_text or "(see attached file)"
     await save_message(db, session.id, "user", stored_user_text, attached_files_meta)
 
+    # Pick a prompt variant for this avatar via Thompson Sampling, if any are
+    # configured. Returns None (falls back to avatar.system_prompt as-is)
+    # for avatars nobody has set up variants for yet.
+    variant = await bandit_service.select_variant_for_avatar(db, avatar.id)
+    system_prompt = _build_system_prompt(avatar, variant)
+
     assistant_text_parts: list[str] = []
     try:
         async with client.messages.stream(
             model=settings.anthropic_model,
             max_tokens=4096,
-            system=avatar.system_prompt,
+            system=system_prompt,
             messages=api_messages,
         ) as stream:
             async for text in stream.text_stream:
@@ -107,9 +129,21 @@ async def stream_chat_response(
         return
 
     assistant_text = "".join(assistant_text_parts)
-    assistant_message = await save_message(db, session.id, "assistant", assistant_text)
+    assistant_message = await save_message(
+        db,
+        session.id,
+        "assistant",
+        assistant_text,
+        prompt_variant_id=variant.id if variant else None,
+    )
 
-    yield f"data: {json.dumps({'type': 'message_done', 'message_id': assistant_message.id})}\n\n"
+    if variant:
+        await bandit_service.record_impression(db, variant)
+
+    done_payload = {"type": "message_done", "message_id": assistant_message.id}
+    if variant:
+        done_payload["prompt_variant"] = {"id": variant.id, "name": variant.name}
+    yield f"data: {json.dumps(done_payload)}\n\n"
 
     # Knowledge tracking: analyze this exchange and update TopicMastery
     try:
