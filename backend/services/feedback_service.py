@@ -1,6 +1,9 @@
-from sqlalchemy import select
+from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from models.avatar import Avatar
+from models.chat_session import ChatSession
+from models.message import Message
 from models.message_feedback import MessageFeedback
 
 
@@ -25,3 +28,39 @@ async def submit_feedback(
     await db.commit()
     await db.refresh(record)
     return record
+
+
+async def get_feedback_summary(db: AsyncSession, user_id: int) -> list[dict]:
+    """Aggregate feedback stats per avatar for the given user."""
+    result = await db.execute(
+        select(
+            Avatar.id.label("avatar_id"),
+            Avatar.name.label("avatar_name"),
+            func.count(MessageFeedback.id).label("total"),
+            func.sum(case((MessageFeedback.rating == 1, 1), else_=0)).label("thumbs_up"),
+            func.sum(case((MessageFeedback.rating == -1, 1), else_=0)).label("thumbs_down"),
+        )
+        .join(ChatSession, ChatSession.avatar_id == Avatar.id)
+        .join(Message, Message.session_id == ChatSession.id)
+        .join(MessageFeedback, MessageFeedback.message_id == Message.id)
+        .where(Avatar.user_id == user_id, MessageFeedback.user_id == user_id)
+        .group_by(Avatar.id, Avatar.name)
+    )
+
+    rows = result.all()
+    summary = []
+    for row in rows:
+        total = row.total or 0
+        up = row.thumbs_up or 0
+        down = row.thumbs_down or 0
+        summary.append(
+            {
+                "avatar_id": row.avatar_id,
+                "avatar_name": row.avatar_name,
+                "total": total,
+                "thumbs_up": up,
+                "thumbs_down": down,
+                "approval_rate": round(up / total, 3) if total > 0 else None,
+            }
+        )
+    return summary

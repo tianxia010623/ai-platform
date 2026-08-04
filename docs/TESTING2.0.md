@@ -164,3 +164,40 @@ Dynamic selection algorithm: Not yet started
 - [ ] Design PromptVariant data model (per-avatar, multiple prompt versions)
 - [ ] Design variant selection logic (start simple: track win-rate per variant; consider bandit algorithm later)
 - [ ] Decide whether feedback should also apply to mastery scoring accuracy, per earlier discussion
+
+## Test Session 5: Feedback Overview Dashboard (Option 2)
+
+### Date
+2026-08-04
+
+### Scope
+Built a feedback statistics dashboard on top of the feedback infrastructure from Test Session 4. This was chosen as the first deliverable for the "feedback-driven prompt optimization" direction, prioritized over the bandit-algorithm approach (Option 1) due to limited real user data at this project stage.
+
+### What Was Built
+
+**Backend:**
+- New endpoint `GET /api/feedback/summary`: aggregates thumbs up/down counts and approval rate per avatar, scoped to the current user
+- New schema `FeedbackSummaryOut`
+
+**Frontend:**
+- New page `app/feedback/page.tsx` ("Feedback Overview"): shows overall approval rate plus a per-avatar breakdown (thumbs up/down counts, approval %)
+- New sidebar link "Feedback Overview"
+- New type `FeedbackSummary` and API call `getFeedbackSummary()`
+
+### Bugs Encountered & Fixed During Implementation
+- Incorrect SQL aggregation syntax: used `func.case(...)` instead of the correct standalone `case(...)` from SQLAlchemy, causing a `TypeError` and a 500 error on every request
+- This 500 error was initially misdiagnosed as a CORS issue in the browser, since a failed backend response doesn't always carry proper CORS headers — the real error was only visible in the backend server logs, not the browser console
+- A missing closing parenthesis was introduced during a manual edit; ultimately resolved by fully rewriting the affected file rather than patching incrementally
+
+### Verification
+- Confirmed the summary endpoint returns correct aggregated data matching the raw `message_feedback` table contents (4 total ratings, 2 up / 2 down, 50% approval)
+- Confirmed the frontend dashboard renders this data correctly at /feedback
+
+### Status
+Feedback collection: Complete
+Feedback statistics dashboard (Option 2): Complete
+Prompt variant system + dynamic selection (Option 1): Not started
+
+### Next Steps
+- [ ] Decide whether to proceed with Option 1 (prompt variants + bandit-style selection), likely using simulated/synthetic feedback data to demonstrate the algorithm given limited real traffic
+- [ ] Consider whether feedback data should also inform mastery scoring, per earlier discussion

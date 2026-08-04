@@ -124,3 +124,12 @@ class MessageFeedbackOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class FeedbackSummaryOut(BaseModel):
+    avatar_id: int
+    avatar_name: str
+    total: int
+    thumbs_up: int
+    thumbs_down: int
+    approval_rate: float | None

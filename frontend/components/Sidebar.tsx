@@ -132,6 +132,12 @@ export default function Sidebar({ activeAvatarId }: { activeAvatarId?: number })
         >
           Knowledge Dashboard
         </Link>
+        <Link
+          href="/feedback"
+          className="mb-1 block rounded-lg px-2 py-2 text-sm text-ink hover:bg-paper"
+        >
+          Feedback Overview
+        </Link>
         <div className="flex items-center justify-between px-2 py-1">
           <span className="truncate text-xs text-ink-muted">{user?.username}</span>
           <button onClick={logout} className="text-xs text-ink-muted hover:text-accent">

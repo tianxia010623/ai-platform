@@ -1,4 +1,4 @@
-import type { Avatar, ChatSession, Message, TopicMastery, User } from "./types";
+import type { Avatar, ChatSession, FeedbackSummary, Message, TopicMastery, User } from "./types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -192,4 +192,8 @@ export async function submitFeedback(messageId: number, rating: number) {
     `/api/feedback/${messageId}`,
     { method: "POST", body: JSON.stringify({ rating }) }
   );
+}
+
+export async function getFeedbackSummary() {
+  return request<FeedbackSummary[]>("/api/feedback/summary");
 }

@@ -53,3 +53,12 @@ export interface MessageFeedback {
   rating: number;
   created_at: string;
 }
+
+export interface FeedbackSummary {
+  avatar_id: number;
+  avatar_name: string;
+  total: number;
+  thumbs_up: number;
+  thumbs_down: number;
+  approval_rate: number | null;
+}
