@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import RequireAuth from "@/components/RequireAuth";
 import Sidebar from "@/components/Sidebar";
 import MessageList, { DisplayMessage } from "@/components/chat/MessageList";
@@ -138,18 +139,26 @@ function ChatContent() {
     <div className="flex h-screen bg-white">
       <Sidebar activeAvatarId={avatarId} />
       <main className="flex flex-1 flex-col">
-        <header className="flex items-center gap-3 border-b border-gray-200 px-6 py-3">
-          {img ? (
-            <img src={img} alt={avatar.name} className="h-9 w-9 rounded-full object-cover" />
-          ) : (
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-light text-sm font-semibold text-accent">
-              {avatar.name.slice(0, 1).toUpperCase()}
-            </span>
-          )}
-          <div>
-            <h1 className="text-sm font-semibold text-ink">{avatar.name}</h1>
-            {avatar.expertise && <p className="text-xs text-ink-muted">{avatar.expertise}</p>}
+        <header className="flex items-center justify-between gap-3 border-b border-gray-200 px-6 py-3">
+          <div className="flex items-center gap-3">
+            {img ? (
+              <img src={img} alt={avatar.name} className="h-9 w-9 rounded-full object-cover" />
+            ) : (
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent-light text-sm font-semibold text-accent">
+                {avatar.name.slice(0, 1).toUpperCase()}
+              </span>
+            )}
+            <div>
+              <h1 className="text-sm font-semibold text-ink">{avatar.name}</h1>
+              {avatar.expertise && <p className="text-xs text-ink-muted">{avatar.expertise}</p>}
+            </div>
           </div>
+          <Link
+            href={`/avatar/${avatarId}/prompt-variants`}
+            className="text-xs font-medium text-ink-muted hover:text-accent"
+          >
+            Prompt Variants
+          </Link>
         </header>
 
         <div className="flex flex-1 flex-col overflow-y-auto">

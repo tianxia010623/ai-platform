@@ -1,4 +1,4 @@
-import type { Avatar, ChatSession, FeedbackSummary, Message, TopicMastery, User } from "./types";
+import type { Avatar, ChatSession, FeedbackSummary, Message, PromptVariant, TopicMastery, User } from "./types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -196,4 +196,23 @@ export async function submitFeedback(messageId: number, rating: number) {
 
 export async function getFeedbackSummary() {
   return request<FeedbackSummary[]>("/api/feedback/summary");
+}
+
+// ---------- Prompt Variants ----------
+export async function listPromptVariants(avatarId: number) {
+  return request<PromptVariant[]>(`/api/avatars/${avatarId}/prompt-variants`);
+}
+
+export async function createPromptVariant(avatarId: number, name: string, promptModifier: string) {
+  return request<PromptVariant>(`/api/avatars/${avatarId}/prompt-variants`, {
+    method: "POST",
+    body: JSON.stringify({ name, prompt_modifier: promptModifier }),
+  });
+}
+
+export async function setPromptVariantActive(avatarId: number, variantId: number, isActive: boolean) {
+  return request<PromptVariant>(`/api/avatars/${avatarId}/prompt-variants/${variantId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ is_active: isActive }),
+  });
 }

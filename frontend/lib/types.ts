@@ -62,3 +62,19 @@ export interface FeedbackSummary {
   thumbs_down: number;
   approval_rate: number | null;
 }
+
+export interface PromptVariant {
+  id: number;
+  avatar_id: number;
+  name: string;
+  prompt_modifier: string;
+  is_baseline: boolean;
+  is_active: boolean;
+  alpha: number;
+  beta: number;
+  times_shown: number;
+  times_positive: number;
+  times_negative: number;
+  estimated_win_rate: number;
+  created_at: string;
+}
