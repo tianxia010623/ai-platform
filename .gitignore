@@ -50,3 +50,6 @@ backend/app.db
 backend/chroma_data/
 backend/uploads/*
 !backend/uploads/.gitkeep
+
+# scratch dir used to move aside git lock files that couldn't be unlinked
+_to_delete/
