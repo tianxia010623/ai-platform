@@ -92,6 +92,10 @@ class MessageOut(BaseModel):
     attached_files: list[dict]
     prompt_variant_id: int | None
     created_at: datetime
+    # The current user's own feedback on this message, if any (1 / -1 / None).
+    # Not a DB column — populated on the Message instance by the route before
+    # serialization, so the frontend can restore 👍/👎 button state on reload.
+    user_feedback: int | None = None
 
     class Config:
         from_attributes = True

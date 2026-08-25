@@ -11,7 +11,7 @@ from core.config import settings
 from core.database import get_db
 from models.user import User
 from schemas import ChatSessionCreate, ChatSessionOut, MessageOut
-from services import avatar_service, chat_service
+from services import avatar_service, chat_service, feedback_service
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -46,7 +46,13 @@ async def get_session_messages(
     session = await chat_service.get_session(db, current_user.id, session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
-    return await chat_service.get_messages(db, session_id)
+    messages = await chat_service.get_messages(db, session_id)
+    feedback_map = await feedback_service.get_feedback_map(
+        db, current_user.id, [m.id for m in messages]
+    )
+    for m in messages:
+        m.user_feedback = feedback_map.get(m.id)
+    return messages
 
 
 def _save_upload(file: UploadFile) -> tuple[Path, str]:

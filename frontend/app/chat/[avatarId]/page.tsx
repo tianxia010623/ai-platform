@@ -59,6 +59,7 @@ function ChatContent() {
             role: m.role,
             content: m.content,
             attachedFiles: m.attached_files,
+            feedback: m.user_feedback,
           }))
         );
       }

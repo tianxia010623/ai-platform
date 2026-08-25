@@ -34,6 +34,7 @@ export interface Message {
   content: string;
   attached_files: { filename: string }[];
   created_at: string;
+  user_feedback: number | null;
 }
 
 export interface TopicMastery {
