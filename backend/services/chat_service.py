@@ -11,8 +11,8 @@ from models.avatar import Avatar
 from models.chat_session import ChatSession
 from models.message import Message
 from models.prompt_variant import PromptVariant
-from services import bandit_service, mastery_service
-from services.file_service import build_content_blocks_for_file
+from services import bandit_service, mastery_service, rag_service
+from services.file_service import build_content_blocks_for_file, extract_full_text
 
 
 async def create_session(db: AsyncSession, user_id: int, avatar_id: int, title: str) -> ChatSession:
@@ -107,11 +107,44 @@ async def stream_chat_response(
     stored_user_text = user_text or "(see attached file)"
     await save_message(db, session.id, "user", stored_user_text, attached_files_meta)
 
+    # RAG: permanently index any newly uploaded files into this avatar's
+    # knowledge base (chunk + embed), so they're retrievable in this turn
+    # AND every future conversation with this avatar -- not just this one.
+    # This is on top of, not instead of, the full-text-in-this-message
+    # behavior above (_build_user_content) so "here's a file, ask about it
+    # right now" still works even before anything is indexed.
+    relevant_chunks: list = []
+    try:
+        for path, original_filename in files:
+            text = extract_full_text(path, original_filename)
+            if text:
+                await rag_service.index_file_for_avatar(db, avatar.id, original_filename, text)
+
+        # Retrieve whatever's semantically relevant to this message from the
+        # avatar's knowledge base (empty if nothing's been indexed, or
+        # nothing clears the relevance bar) and fold it into the system
+        # prompt.
+        relevant_chunks = await rag_service.retrieve_relevant_chunks(db, avatar.id, user_text)
+    except Exception:  # noqa: BLE001
+        # RAG is additive context, not core chat functionality -- a bad
+        # embedding call (e.g. sentence-transformers not installed yet)
+        # should never take down the whole conversation.
+        relevant_chunks = []
+
     # Pick a prompt variant for this avatar via Thompson Sampling, if any are
     # configured. Returns None (falls back to avatar.system_prompt as-is)
     # for avatars nobody has set up variants for yet.
     variant = await bandit_service.select_variant_for_avatar(db, avatar.id)
     system_prompt = _build_system_prompt(avatar, variant)
+    if relevant_chunks:
+        context_block = "\n\n".join(
+            f"[From {c.source_filename}]\n{c.content}" for c in relevant_chunks
+        )
+        system_prompt = (
+            f"{system_prompt}\n\n"
+            "Relevant context retrieved from files this user has previously shared "
+            f"with you:\n\n{context_block}"
+        )
 
     assistant_text_parts: list[str] = []
     try:
@@ -143,6 +176,12 @@ async def stream_chat_response(
     done_payload = {"type": "message_done", "message_id": assistant_message.id}
     if variant:
         done_payload["prompt_variant"] = {"id": variant.id, "name": variant.name}
+    if relevant_chunks:
+        seen = []
+        for c in relevant_chunks:
+            if c.source_filename not in seen:
+                seen.append(c.source_filename)
+        done_payload["retrieved_sources"] = seen
     yield f"data: {json.dumps(done_payload)}\n\n"
 
     # Knowledge tracking: analyze this exchange and update TopicMastery

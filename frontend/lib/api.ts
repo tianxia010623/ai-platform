@@ -133,7 +133,7 @@ export async function getAvatarMastery(avatarId: number) {
 // ---------- Streaming chat ----------
 export type StreamEvent =
   | { type: "delta"; content: string }
-  | { type: "message_done"; message_id: number }
+  | { type: "message_done"; message_id: number; prompt_variant?: { id: number; name: string }; retrieved_sources?: string[] }
   | { type: "mastery_update"; topics: { topic: string; mastery_score: number; interaction_count: number }[] }
   | { type: "error"; message: string }
   | { type: "done" };

@@ -98,7 +98,16 @@ function ChatContent() {
           );
         } else if (event.type === "message_done") {
           setMessages((prev) =>
-            prev.map((m) => (m.id === assistantId ? { ...m, id: event.message_id, streaming: false } : m))
+            prev.map((m) =>
+              m.id === assistantId
+                ? {
+                    ...m,
+                    id: event.message_id,
+                    streaming: false,
+                    retrievedSources: event.retrieved_sources,
+                  }
+                : m
+            )
           );
         } else if (event.type === "error") {
           setMessages((prev) =>

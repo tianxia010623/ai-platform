@@ -35,6 +35,7 @@ async def init_db() -> None:
     from models import (  # noqa: F401
         avatar,
         chat_session,
+        document_chunk,
         message,
         message_feedback,
         prompt_variant,

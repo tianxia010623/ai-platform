@@ -13,6 +13,10 @@ export interface DisplayMessage {
   attachedFiles?: { filename: string }[];
   streaming?: boolean;
   feedback?: number | null;
+  // Filenames of previously-uploaded files whose content (via RAG
+  // retrieval) informed this specific reply -- see chat_service.py's
+  // retrieved_sources on the "message_done" SSE event.
+  retrievedSources?: string[];
 }
 
 export default function MessageList({
@@ -99,6 +103,11 @@ export default function MessageList({
             )}
             {m.content}
             {m.streaming && <span className="ml-0.5 inline-block animate-pulse">▍</span>}
+            {m.role === "assistant" && !m.streaming && m.retrievedSources && m.retrievedSources.length > 0 && (
+              <div className="mt-1.5 text-xs text-ink-muted">
+                📚 referencing: {m.retrievedSources.join(", ")}
+              </div>
+            )}
             {m.role === "assistant" && !m.streaming && typeof m.id === "number" && (() => {
               // feedbackMap holds an optimistic override for clicks made this
               // session; fall back to what the server told us this message's

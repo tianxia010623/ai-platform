@@ -14,6 +14,12 @@ PDF_EXTENSIONS = {".pdf"}
 
 MAX_PDF_CHARS = 3000
 MAX_CODE_CHARS = 8000
+# Higher cap used only when indexing a file into the RAG knowledge base
+# (backend/services/rag_service.py) -- unlike the single-turn "paste the
+# whole file into this message" caps above, an indexed file gets chunked and
+# only the most relevant pieces are retrieved later, so it can afford to
+# keep a lot more of the document without bloating every future prompt.
+MAX_INDEX_CHARS = 20000
 
 
 def classify_file(filename: str) -> str:
@@ -70,3 +76,30 @@ def build_content_blocks_for_file(file_path: Path, original_filename: str) -> li
     # code / plain text
     text = read_code_file(file_path)
     return [{"type": "text", "text": f"[Attached file: {original_filename}]\n```\n{text}\n```"}]
+
+
+def extract_full_text(file_path: Path, original_filename: str) -> str | None:
+    """Extracts as much text as reasonable from a PDF or code/text file for
+    RAG indexing (see rag_service.index_file_for_avatar). Returns None for
+    file types with no meaningful text to index (currently just images)."""
+    kind = classify_file(original_filename)
+    if kind == "image":
+        return None
+    if kind == "pdf":
+        try:
+            reader = PdfReader(str(file_path))
+            parts = []
+            total = 0
+            for page in reader.pages:
+                text = page.extract_text() or ""
+                parts.append(text)
+                total += len(text)
+                if total >= MAX_INDEX_CHARS:
+                    break
+            return "\n".join(parts)[:MAX_INDEX_CHARS]
+        except Exception:  # noqa: BLE001
+            return None
+    try:
+        return file_path.read_text(encoding="utf-8", errors="replace")[:MAX_INDEX_CHARS]
+    except Exception:  # noqa: BLE001
+        return None
