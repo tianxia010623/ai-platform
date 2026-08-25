@@ -25,6 +25,18 @@ TOP_K = 4
 MIN_SIMILARITY = 0.2
 
 
+# Multilingual, not the more common "all-MiniLM-L6-v2" -- this app's users
+# ask questions in Chinese (and English) about files that are often in
+# English (e.g. academic papers), and all-MiniLM-L6-v2 is effectively an
+# English-only model: a Chinese query and its relevant English passage don't
+# end up close together in its embedding space, so cross-lingual retrieval
+# silently returns nothing (found this the hard way -- see docs/RAG.md).
+# paraphrase-multilingual-MiniLM-L12-v2 is trained so semantically similar
+# text in *different* languages lands close together, which is exactly the
+# case this app needs to support.
+EMBEDDING_MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
+
+
 @lru_cache(maxsize=1)
 def _get_model():
     # Imported lazily so nothing else in the app pays sentence-transformers'
@@ -32,7 +44,7 @@ def _get_model():
     # retrieval run against it.
     from sentence_transformers import SentenceTransformer
 
-    return SentenceTransformer("all-MiniLM-L6-v2")
+    return SentenceTransformer(EMBEDDING_MODEL_NAME)
 
 
 def embed(text: str) -> list[float]:

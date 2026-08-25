@@ -28,15 +28,33 @@ knowledge" than "attach a file to this chat". Indexing against
 `avatar_id` means a file uploaded once is retrievable in every future
 conversation with that avatar, not just the session it was uploaded in.
 
-## Why sentence-transformers (`all-MiniLM-L6-v2`) over an API-based embedding
+## Why sentence-transformers over an API-based embedding
 
 - No extra API key or per-call cost — the avatar chat itself already
   depends on the Anthropic API being configured; embeddings don't need to.
 - Runs locally, so it works offline and doesn't add latency from an
   external call for every message.
-- `all-MiniLM-L6-v2` is a well-known, fast, small (~80MB) sentence
-  embedding model — 384-dimensional vectors, good enough for short document
-  chunks at this project's scale.
+
+## Why `paraphrase-multilingual-MiniLM-L12-v2`, not the more common `all-MiniLM-L6-v2`
+
+The first version of this used `all-MiniLM-L6-v2` (the default most
+tutorials reach for) and retrieval silently returned nothing for every
+real query. Root cause: this app's users ask questions in Chinese about
+files that are often in English (e.g. academic papers), and
+`all-MiniLM-L6-v2` is effectively an English-only model — a Chinese
+question and its genuinely relevant English passage don't land close
+together in its embedding space, so every similarity score stayed under
+the relevance floor and every retrieval came back empty. There was no
+exception, no error in the logs -- it just quietly never found anything,
+which made this a "the feature does nothing" bug rather than a crash, and
+took manual end-to-end testing (not unit tests) to catch.
+
+`paraphrase-multilingual-MiniLM-L12-v2` is trained across 50+ languages so
+that semantically equivalent text in *different* languages ends up close
+together in the same embedding space — exactly the cross-lingual case this
+app needs. It's a larger download than the English-only model (~470MB vs.
+~80MB) but the same architecture family and still fast enough to run
+locally per-message.
 
 ## Why cosine similarity over a plain list, not a vector database
 
@@ -85,8 +103,9 @@ breaking the whole chat turn — retrieval is additive, not load-bearing.
 pip install -r requirements.txt   # pulls in sentence-transformers + torch
 ```
 
-The first call to `_get_model()` downloads `all-MiniLM-L6-v2` (~80MB) from
-Hugging Face and caches it locally; after that it loads from disk.
+The first call to `_get_model()` downloads `paraphrase-multilingual-MiniLM-L12-v2`
+(~470MB) from Hugging Face and caches it locally; after that it loads from
+disk.
 
 ## Next steps
 

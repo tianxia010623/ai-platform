@@ -1,8 +1,9 @@
 import base64
 import mimetypes
+import re
 from pathlib import Path
 
-from PyPDF2 import PdfReader
+import fitz  # PyMuPDF
 
 CODE_EXTENSIONS = {
     ".py", ".js", ".ts", ".tsx", ".jsx", ".java", ".c", ".cpp", ".h", ".hpp",
@@ -31,16 +32,43 @@ def classify_file(filename: str) -> str:
     return "code"
 
 
+def _fix_glued_words(text: str) -> str:
+    """Belt-and-suspenders cleanup on top of PyMuPDF's extraction (which is
+    already layout-aware and usually gets word spacing right, unlike the
+    PyPDF2 extractor this used to use). Inserts a space wherever a
+    lowercase letter or digit is immediately followed by an uppercase
+    letter, and wherever sentence-ending punctuation is immediately
+    followed by a letter with no space -- catches the occasional residual
+    glued word without needing a dictionary."""
+    text = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", text)
+    text = re.sub(r"(?<=[.,;:])(?=[A-Za-z])", " ", text)
+    return text
+
+
+def _extract_pdf_raw(file_path: Path, max_chars: int) -> str:
+    """Extracts text page by page via PyMuPDF, which -- unlike the PyPDF2
+    extractor this used to use -- reliably preserves word-boundary spaces
+    on multi-column academic-paper layouts. (PyPDF2 would turn "A two-stage
+    approach" into "Atwo-stage approach"; that glued text made for garbled,
+    low-similarity RAG embeddings -- see rag_service.py.)"""
+    doc = fitz.open(str(file_path))
+    try:
+        parts = []
+        total = 0
+        for page in doc:
+            text = page.get_text() or ""
+            parts.append(text)
+            total += len(text)
+            if total >= max_chars:
+                break
+        return _fix_glued_words("\n".join(parts))[:max_chars]
+    finally:
+        doc.close()
+
+
 def extract_pdf_text(file_path: Path) -> str:
     try:
-        reader = PdfReader(str(file_path))
-        text_parts = []
-        for page in reader.pages:
-            text_parts.append(page.extract_text() or "")
-            if sum(len(p) for p in text_parts) >= MAX_PDF_CHARS:
-                break
-        text = "\n".join(text_parts)
-        return text[:MAX_PDF_CHARS]
+        return _extract_pdf_raw(file_path, MAX_PDF_CHARS)
     except Exception as exc:  # noqa: BLE001
         return f"[Could not extract PDF text: {exc}]"
 
@@ -87,16 +115,7 @@ def extract_full_text(file_path: Path, original_filename: str) -> str | None:
         return None
     if kind == "pdf":
         try:
-            reader = PdfReader(str(file_path))
-            parts = []
-            total = 0
-            for page in reader.pages:
-                text = page.extract_text() or ""
-                parts.append(text)
-                total += len(text)
-                if total >= MAX_INDEX_CHARS:
-                    break
-            return "\n".join(parts)[:MAX_INDEX_CHARS]
+            return _extract_pdf_raw(file_path, MAX_INDEX_CHARS)
         except Exception:  # noqa: BLE001
             return None
     try:
