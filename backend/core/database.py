@@ -28,6 +28,12 @@ def _add_missing_columns(sync_conn) -> None:
             sync_conn.execute(
                 sa.text("ALTER TABLE messages ADD COLUMN prompt_variant_id INTEGER")
             )
+    if "users" in inspector.get_table_names():
+        existing_cols = {c["name"] for c in inspector.get_columns("users")}
+        if "reset_token" not in existing_cols:
+            sync_conn.execute(sa.text("ALTER TABLE users ADD COLUMN reset_token VARCHAR(255)"))
+        if "reset_token_expires" not in existing_cols:
+            sync_conn.execute(sa.text("ALTER TABLE users ADD COLUMN reset_token_expires DATETIME"))
 
 
 async def init_db() -> None:

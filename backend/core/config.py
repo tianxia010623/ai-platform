@@ -31,6 +31,12 @@ class Settings(BaseSettings):
     # CORS
     frontend_origin: str = "http://localhost:3000"
 
+    # Email (Resend) -- used for the "forgot password" flow. Empty by
+    # default so the app still runs without it; forgot-password just returns
+    # a clear error until a key is set in .env.
+    resend_api_key: str = ""
+    email_from: str = "AI Avatars <onboarding@resend.dev>"
+
 
 settings = Settings()
 

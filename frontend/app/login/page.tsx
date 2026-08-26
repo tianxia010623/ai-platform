@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 
@@ -69,6 +70,14 @@ export default function LoginPage() {
             type="password"
             className="w-full rounded-lg border border-line bg-paper/40 px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:bg-white focus:ring-2 focus:ring-accent/20"
           />
+
+          {mode === "login" && (
+            <div className="text-right">
+              <Link href="/forgot-password" className="text-xs text-ink-muted hover:text-accent">
+                Forgot password?
+              </Link>
+            </div>
+          )}
 
           {error && <p className="text-sm text-red-600">{error}</p>}
 

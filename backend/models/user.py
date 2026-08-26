@@ -16,6 +16,11 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
+    # "Forgot password" flow: a one-time token emailed to the user, valid
+    # until reset_token_expires. Both null when no reset is pending; a
+    # successful reset (or issuing a new token) clears/replaces them.
+    reset_token: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    reset_token_expires: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     avatars: Mapped[list["Avatar"]] = relationship(back_populates="user", cascade="all, delete-orphan")
     chat_sessions: Mapped[list["ChatSession"]] = relationship(
