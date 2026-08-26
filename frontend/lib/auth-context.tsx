@@ -12,6 +12,9 @@ interface AuthContextValue {
   login: (username: string, password: string) => Promise<void>;
   register: (username: string, email: string, password: string) => Promise<void>;
   logout: () => void;
+  /** Update the cached user profile (e.g. after editing it on /profile)
+   * without a full re-login. */
+  updateUser: (user: User) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -53,9 +56,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push("/login");
   }
 
+  function handleUpdateUser(updated: User) {
+    localStorage.setItem(USER_KEY, JSON.stringify(updated));
+    setUser(updated);
+  }
+
   return (
     <AuthContext.Provider
-      value={{ user, loading, login: handleLogin, register: handleRegister, logout: handleLogout }}
+      value={{
+        user,
+        loading,
+        login: handleLogin,
+        register: handleRegister,
+        logout: handleLogout,
+        updateUser: handleUpdateUser,
+      }}
     >
       {children}
     </AuthContext.Provider>
