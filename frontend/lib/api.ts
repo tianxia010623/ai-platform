@@ -79,6 +79,38 @@ export async function register(username: string, email: string, password: string
   );
 }
 
+export async function getMe() {
+  return request<User>("/api/auth/me");
+}
+
+export async function updateProfile(data: {
+  username?: string;
+  email?: string;
+  current_password?: string;
+  new_password?: string;
+}) {
+  return request<User>("/api/auth/me", {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function forgotPassword(email: string) {
+  return request<{ message: string }>(
+    "/api/auth/forgot-password",
+    { method: "POST", body: JSON.stringify({ email }) },
+    { skipAuthRedirect: true }
+  );
+}
+
+export async function resetPassword(token: string, newPassword: string) {
+  return request<{ message: string }>(
+    "/api/auth/reset-password",
+    { method: "POST", body: JSON.stringify({ token, new_password: newPassword }) },
+    { skipAuthRedirect: true }
+  );
+}
+
 export async function login(username: string, password: string) {
   return request<{ access_token: string; user: User }>(
     "/api/auth/login",
@@ -121,6 +153,13 @@ export async function getSessionMessages(sessionId: number) {
   return request<Message[]>(`/api/chat/sessions/${sessionId}/messages`);
 }
 
+export async function renameSession(sessionId: number, title: string) {
+  return request<ChatSession>(`/api/chat/sessions/${sessionId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ title }),
+  });
+}
+
 // ---------- Mastery ----------
 export async function getAllMastery() {
   return request<TopicMastery[]>("/api/mastery");
@@ -133,7 +172,7 @@ export async function getAvatarMastery(avatarId: number) {
 // ---------- Streaming chat ----------
 export type StreamEvent =
   | { type: "delta"; content: string }
-  | { type: "message_done"; message_id: number; prompt_variant?: { id: number; name: string }; retrieved_sources?: string[] }
+  | { type: "message_done"; message_id: number; prompt_variant?: { id: number; name: string }; retrieved_sources?: string[]; session_title?: string }
   | { type: "mastery_update"; topics: { topic: string; mastery_score: number; interaction_count: number }[] }
   | { type: "error"; message: string }
   | { type: "done" };

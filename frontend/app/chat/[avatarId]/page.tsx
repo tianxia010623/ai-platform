@@ -22,6 +22,7 @@ function ChatContent() {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [sending, setSending] = useState(false);
   const [initializing, setInitializing] = useState(true);
+  const [sessionsRefreshSignal, setSessionsRefreshSignal] = useState(0);
   const streamingIdRef = useRef(0);
 
   // Load avatar
@@ -74,6 +75,7 @@ function ChatContent() {
 
   async function handleSend(text: string, files: File[]) {
     if (!sessionId) return;
+    const wasFirstMessage = messages.length === 0;
     setSending(true);
 
     const userMsgId = `local-${Date.now()}`;
@@ -109,6 +111,12 @@ function ChatContent() {
                 : m
             )
           );
+          if (wasFirstMessage) {
+            // The backend just auto-named this session from the first
+            // message; tell the sidebar to refetch so it shows up there
+            // instead of staying "New Chat".
+            setSessionsRefreshSignal((n) => n + 1);
+          }
         } else if (event.type === "error") {
           setMessages((prev) =>
             prev.map((m) =>
@@ -135,7 +143,7 @@ function ChatContent() {
   if (!avatar || initializing) {
     return (
       <div className="flex h-screen bg-white">
-        <Sidebar activeAvatarId={avatarId} />
+        <Sidebar activeAvatarId={avatarId} refreshSignal={sessionsRefreshSignal} />
         <main className="flex flex-1 items-center justify-center text-sm text-ink-muted">
           Loading conversation...
         </main>
@@ -147,7 +155,7 @@ function ChatContent() {
 
   return (
     <div className="flex h-screen bg-white">
-      <Sidebar activeAvatarId={avatarId} />
+      <Sidebar activeAvatarId={avatarId} refreshSignal={sessionsRefreshSignal} />
       <main className="flex flex-1 flex-col">
         <header className="flex items-center justify-between gap-3 border-b border-gray-200 px-6 py-3">
           <div className="flex items-center gap-3">

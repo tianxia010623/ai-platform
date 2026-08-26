@@ -10,10 +10,21 @@ import type { Avatar, ChatSession } from "@/lib/types";
 import { useAuth } from "@/lib/auth-context";
 import ThemeSwitcher from "@/components/ThemeSwitcher";
 
-export default function Sidebar({ activeAvatarId }: { activeAvatarId?: number }) {
+export default function Sidebar({
+  activeAvatarId,
+  refreshSignal,
+}: {
+  activeAvatarId?: number;
+  /** Bump this (e.g. `+1`) from a parent page to force the session list to
+   * refetch -- used after a session gets auto-named from its first message,
+   * since the sidebar otherwise has no way to know that happened. */
+  refreshSignal?: number;
+}) {
   const [avatars, setAvatars] = useState<Avatar[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [creatingSession, setCreatingSession] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState("");
   const pathname = usePathname();
   const router = useRouter();
   const { logout, user } = useAuth();
@@ -31,7 +42,21 @@ export default function Sidebar({ activeAvatarId }: { activeAvatarId?: number })
     } else {
       setSessions([]);
     }
-  }, [activeAvatarId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeAvatarId, refreshSignal]);
+
+  async function commitRename(sessionId: number) {
+    const title = editValue.trim();
+    setEditingId(null);
+    if (!title) return;
+    const previous = sessions;
+    setSessions((cur) => cur.map((s) => (s.id === sessionId ? { ...s, title } : s)));
+    try {
+      await api.renameSession(sessionId, title);
+    } catch {
+      setSessions(previous);
+    }
+  }
 
   async function handleNewChat() {
     if (!activeAvatarId || creatingSession) return;
@@ -108,18 +133,40 @@ export default function Sidebar({ activeAvatarId }: { activeAvatarId?: number })
                 + New Chat
               </button>
             </div>
-            {sessions.map((s) => (
-              <Link
-                key={s.id}
-                href={`/chat/${activeAvatarId}?session=${s.id}`}
-                className={clsx(
-                  "block truncate rounded-lg px-2 py-1.5 text-sm text-ink-muted hover:bg-paper",
-                  pathname === `/chat/${activeAvatarId}` && "text-ink"
-                )}
-              >
-                {s.title}
-              </Link>
-            ))}
+            {sessions.map((s) =>
+              editingId === s.id ? (
+                <input
+                  key={s.id}
+                  autoFocus
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  onBlur={() => commitRename(s.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commitRename(s.id);
+                    if (e.key === "Escape") setEditingId(null);
+                  }}
+                  className="block w-full truncate rounded-lg border border-accent bg-surface px-2 py-1.5 text-sm text-ink outline-none"
+                />
+              ) : (
+                <Link
+                  key={s.id}
+                  href={`/chat/${activeAvatarId}?session=${s.id}`}
+                  onDoubleClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setEditingId(s.id);
+                    setEditValue(s.title);
+                  }}
+                  title="双击重命名"
+                  className={clsx(
+                    "block truncate rounded-lg px-2 py-1.5 text-sm text-ink-muted hover:bg-paper",
+                    pathname === `/chat/${activeAvatarId}` && "text-ink"
+                  )}
+                >
+                  {s.title}
+                </Link>
+              )
+            )}
           </div>
         )}
       </nav>
@@ -137,6 +184,12 @@ export default function Sidebar({ activeAvatarId }: { activeAvatarId?: number })
           className="mb-1 block rounded-lg px-2 py-2 text-sm text-ink hover:bg-paper"
         >
           Feedback Overview
+        </Link>
+        <Link
+          href="/profile"
+          className="mb-1 block rounded-lg px-2 py-2 text-sm text-ink hover:bg-paper"
+        >
+          Your Profile
         </Link>
         <div className="flex items-center justify-between px-2 py-1">
           <span className="truncate text-xs text-ink-muted">{user?.username}</span>

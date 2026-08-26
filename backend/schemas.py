@@ -31,6 +31,25 @@ class TokenOut(BaseModel):
     user: UserOut
 
 
+class UserProfileUpdate(BaseModel):
+    """All fields optional -- send only what you want to change. Changing
+    the password requires the current one, verified server-side."""
+
+    username: str | None = Field(default=None, min_length=3, max_length=64)
+    email: EmailStr | None = None
+    current_password: str | None = None
+    new_password: str | None = Field(default=None, min_length=6, max_length=128)
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(min_length=6, max_length=128)
+
+
 # ---------- Avatar ----------
 class AvatarCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
@@ -71,6 +90,10 @@ class AvatarOut(BaseModel):
 class ChatSessionCreate(BaseModel):
     avatar_id: int
     title: str = "New Chat"
+
+
+class ChatSessionUpdate(BaseModel):
+    title: str = Field(min_length=1, max_length=60)
 
 
 class ChatSessionOut(BaseModel):

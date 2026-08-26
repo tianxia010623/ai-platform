@@ -39,6 +39,26 @@ async def get_session(db: AsyncSession, user_id: int, session_id: int) -> ChatSe
     return result.scalar_one_or_none()
 
 
+async def rename_session(db: AsyncSession, user_id: int, session_id: int, title: str) -> ChatSession | None:
+    """Manually rename a session (the "self-name it" feature)."""
+    session = await get_session(db, user_id, session_id)
+    if session is None:
+        return None
+    session.title = title.strip()[:60] or session.title
+    await db.commit()
+    await db.refresh(session)
+    return session
+
+
+def _auto_title_from_text(text: str, max_len: int = 40) -> str:
+    """Collapse whitespace and truncate the first user message into a short
+    session title, the same way most chat apps auto-name a fresh thread."""
+    collapsed = " ".join(text.split())
+    if len(collapsed) <= max_len:
+        return collapsed
+    return collapsed[: max_len - 1].rstrip() + "\u2026"
+
+
 async def get_messages(db: AsyncSession, session_id: int) -> list[Message]:
     result = await db.execute(
         select(Message).where(Message.session_id == session_id).order_by(Message.created_at.asc())
@@ -97,6 +117,7 @@ async def stream_chat_response(
     assistant message, then run knowledge tracking. Yields SSE-formatted strings."""
 
     history = await get_messages(db, session.id)
+    is_first_message = not history
     api_messages = [
         {"role": m.role, "content": m.content} for m in history if m.content
     ]
@@ -106,6 +127,17 @@ async def stream_chat_response(
 
     stored_user_text = user_text or "(see attached file)"
     await save_message(db, session.id, "user", stored_user_text, attached_files_meta)
+
+    # Auto-name fresh sessions from their first message, the same way most
+    # chat apps replace a generic "New Chat" placeholder once there's
+    # something real to call it -- otherwise every session in the sidebar
+    # (across every avatar) is titled identically and looks like nothing
+    # ever changes when you switch avatars. A manual rename (PATCH
+    # /sessions/{id}) still overrides this on request.
+    if is_first_message and session.title == "New Chat" and stored_user_text.strip():
+        session.title = _auto_title_from_text(stored_user_text)
+        await db.commit()
+        await db.refresh(session)
 
     # RAG: permanently index any newly uploaded files into this avatar's
     # knowledge base (chunk + embed), so they're retrievable in this turn
@@ -174,6 +206,8 @@ async def stream_chat_response(
         await bandit_service.record_impression(db, variant)
 
     done_payload = {"type": "message_done", "message_id": assistant_message.id}
+    if is_first_message:
+        done_payload["session_title"] = session.title
     if variant:
         done_payload["prompt_variant"] = {"id": variant.id, "name": variant.name}
     if relevant_chunks:

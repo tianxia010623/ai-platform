@@ -10,7 +10,7 @@ from core.ai_client import anthropic_client
 from core.config import settings
 from core.database import get_db
 from models.user import User
-from schemas import ChatSessionCreate, ChatSessionOut, MessageOut
+from schemas import ChatSessionCreate, ChatSessionOut, ChatSessionUpdate, MessageOut
 from services import avatar_service, chat_service, feedback_service
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -35,6 +35,19 @@ async def list_sessions(
     current_user: User = Depends(get_current_user),
 ):
     return await chat_service.list_sessions(db, current_user.id, avatar_id)
+
+
+@router.patch("/sessions/{session_id}", response_model=ChatSessionOut)
+async def update_session(
+    session_id: int,
+    data: ChatSessionUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    session = await chat_service.rename_session(db, current_user.id, session_id, data.title)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return session
 
 
 @router.get("/sessions/{session_id}/messages", response_model=list[MessageOut])

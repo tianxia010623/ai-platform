@@ -53,3 +53,4 @@ backend/uploads/*
 
 # scratch dir used to move aside git lock files that couldn't be unlinked
 _to_delete/
+*.tsbuildinfo
