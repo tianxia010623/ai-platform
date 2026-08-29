@@ -25,6 +25,11 @@ export default function Sidebar({
   const [creatingForAvatarId, setCreatingForAvatarId] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
+  // Which avatar's chat history is currently open in the sidebar. Starts
+  // out following activeAvatarId (open a chat, its list expands) but is
+  // then independent -- clicking the already-expanded avatar again just
+  // collapses it without navigating anywhere.
+  const [expandedId, setExpandedId] = useState<number | undefined>(activeAvatarId);
   const pathname = usePathname();
   const router = useRouter();
   const { logout, user } = useAuth();
@@ -32,6 +37,23 @@ export default function Sidebar({
   useEffect(() => {
     api.listAvatars().then(setAvatars).catch(() => setAvatars([]));
   }, []);
+
+  useEffect(() => {
+    if (activeAvatarId) setExpandedId(activeAvatarId);
+  }, [activeAvatarId]);
+
+  function handleAvatarClick(avatarId: number, e: React.MouseEvent) {
+    const alreadyThere = pathname === `/chat/${avatarId}`;
+    if (expandedId === avatarId) {
+      // Second click on the already-expanded avatar: just collapse it.
+      e.preventDefault();
+      setExpandedId(undefined);
+    } else {
+      setExpandedId(avatarId);
+      if (alreadyThere) e.preventDefault();
+      // otherwise let the Link navigate there normally
+    }
+  }
 
   // Every avatar gets its own chat history nested directly under it, so we
   // fetch every session the user has (no avatar_id filter) once and group
@@ -108,6 +130,7 @@ export default function Sidebar({
             <div key={avatar.id} className="mb-2">
               <Link
                 href={`/chat/${avatar.id}`}
+                onClick={(e) => handleAvatarClick(avatar.id, e)}
                 className={clsx(
                   "flex items-center gap-2 rounded-lg px-2 py-2 text-sm transition",
                   isActive ? "bg-accent-light font-medium text-accent" : "text-ink hover:bg-paper"
@@ -128,10 +151,10 @@ export default function Sidebar({
               </Link>
 
               {/* This avatar's own chat history, nested right under it
-                 instead of in one shared section. Collapsed for every
-                 avatar except the one you're currently in -- click an
-                 avatar to open it, which also expands its chat list. */}
-              {isActive && (
+                 instead of in one shared section. Clicking an avatar opens
+                 it and expands its chat list; clicking the already-open
+                 one again collapses it. */}
+              {expandedId === avatar.id && (
               <div className="ml-4 mt-1 space-y-0.5 border-l border-line pl-2">
                 {avatarSessions.map((s) =>
                   editingId === s.id ? (
