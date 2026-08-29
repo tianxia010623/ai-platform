@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import clsx from "clsx";
@@ -22,7 +22,7 @@ export default function Sidebar({
 }) {
   const [avatars, setAvatars] = useState<Avatar[]>([]);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [creatingSession, setCreatingSession] = useState(false);
+  const [creatingForAvatarId, setCreatingForAvatarId] = useState<number | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editValue, setEditValue] = useState("");
   const pathname = usePathname();
@@ -33,17 +33,26 @@ export default function Sidebar({
     api.listAvatars().then(setAvatars).catch(() => setAvatars([]));
   }, []);
 
+  // Every avatar gets its own chat history nested directly under it, so we
+  // fetch every session the user has (no avatar_id filter) once and group
+  // them client-side -- simpler than re-fetching per avatar.
   useEffect(() => {
-    if (activeAvatarId) {
-      api
-        .listSessions(activeAvatarId)
-        .then(setSessions)
-        .catch(() => setSessions([]));
-    } else {
-      setSessions([]);
-    }
+    api
+      .listSessions()
+      .then(setSessions)
+      .catch(() => setSessions([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeAvatarId, refreshSignal]);
+  }, [refreshSignal]);
+
+  const sessionsByAvatar = useMemo(() => {
+    const map = new Map<number, ChatSession[]>();
+    for (const s of sessions) {
+      const list = map.get(s.avatar_id) ?? [];
+      list.push(s);
+      map.set(s.avatar_id, list);
+    }
+    return map;
+  }, [sessions]);
 
   async function commitRename(sessionId: number) {
     const title = editValue.trim();
@@ -58,15 +67,15 @@ export default function Sidebar({
     }
   }
 
-  async function handleNewChat() {
-    if (!activeAvatarId || creatingSession) return;
-    setCreatingSession(true);
+  async function handleNewChat(avatarId: number) {
+    if (creatingForAvatarId) return;
+    setCreatingForAvatarId(avatarId);
     try {
-      const created = await api.createSession(activeAvatarId);
+      const created = await api.createSession(avatarId);
       setSessions((prev) => [created, ...prev]);
-      router.push(`/chat/${activeAvatarId}?session=${created.id}`);
+      router.push(`/chat/${avatarId}?session=${created.id}`);
     } finally {
-      setCreatingSession(false);
+      setCreatingForAvatarId(null);
     }
   }
 
@@ -94,81 +103,80 @@ export default function Sidebar({
         {avatars.map((avatar) => {
           const isActive = avatar.id === activeAvatarId;
           const img = avatarImageUrl(avatar);
+          const avatarSessions = sessionsByAvatar.get(avatar.id) ?? [];
           return (
-            <Link
-              key={avatar.id}
-              href={`/chat/${avatar.id}`}
-              className={clsx(
-                "flex items-center gap-2 rounded-lg px-2 py-2 text-sm transition",
-                isActive ? "bg-accent-light font-medium text-accent" : "text-ink hover:bg-paper"
-              )}
-            >
-              {img ? (
-                <img
-                  src={img}
-                  alt={avatar.name}
-                  className="h-7 w-7 rounded-full object-cover ring-2 ring-surface"
-                />
-              ) : (
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-light text-xs font-semibold text-accent ring-2 ring-surface">
-                  {avatar.name.slice(0, 1).toUpperCase()}
-                </span>
-              )}
-              <span className="truncate">{avatar.name}</span>
-            </Link>
+            <div key={avatar.id} className="mb-2">
+              <Link
+                href={`/chat/${avatar.id}`}
+                className={clsx(
+                  "flex items-center gap-2 rounded-lg px-2 py-2 text-sm transition",
+                  isActive ? "bg-accent-light font-medium text-accent" : "text-ink hover:bg-paper"
+                )}
+              >
+                {img ? (
+                  <img
+                    src={img}
+                    alt={avatar.name}
+                    className="h-7 w-7 rounded-full object-cover ring-2 ring-surface"
+                  />
+                ) : (
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-light text-xs font-semibold text-accent ring-2 ring-surface">
+                    {avatar.name.slice(0, 1).toUpperCase()}
+                  </span>
+                )}
+                <span className="truncate">{avatar.name}</span>
+              </Link>
+
+              {/* This avatar's own chat history, nested right under it
+                 instead of in one shared section -- so it's obvious which
+                 conversations belong to which avatar even before you click
+                 into one. */}
+              <div className="ml-4 mt-1 space-y-0.5 border-l border-line pl-2">
+                {avatarSessions.map((s) =>
+                  editingId === s.id ? (
+                    <input
+                      key={s.id}
+                      autoFocus
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onBlur={() => commitRename(s.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") commitRename(s.id);
+                        if (e.key === "Escape") setEditingId(null);
+                      }}
+                      className="block w-full truncate rounded-lg border border-accent bg-surface px-2 py-1 text-xs text-ink outline-none"
+                    />
+                  ) : (
+                    <Link
+                      key={s.id}
+                      href={`/chat/${avatar.id}?session=${s.id}`}
+                      onDoubleClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setEditingId(s.id);
+                        setEditValue(s.title);
+                      }}
+                      title="双击重命名"
+                      className={clsx(
+                        "block truncate rounded-lg px-2 py-1 text-xs text-ink-muted hover:bg-paper",
+                        pathname === `/chat/${avatar.id}` && "text-ink"
+                      )}
+                    >
+                      {s.title}
+                    </Link>
+                  )
+                )}
+                <button
+                  onClick={() => handleNewChat(avatar.id)}
+                  disabled={creatingForAvatarId === avatar.id}
+                  className="block w-full truncate rounded-lg px-2 py-1 text-left font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-accent hover:text-accent-hover disabled:opacity-50"
+                >
+                  + New Chat
+                </button>
+              </div>
+            </div>
           );
         })}
-
-        {activeAvatarId && (
-          <div className="mt-4">
-            <div className="flex items-center justify-between px-1 pb-2">
-              <p className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-ink-muted">
-                Chat History
-              </p>
-              <button
-                onClick={handleNewChat}
-                disabled={creatingSession}
-                className="font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-accent hover:text-accent-hover disabled:opacity-50"
-              >
-                + New Chat
-              </button>
-            </div>
-            {sessions.map((s) =>
-              editingId === s.id ? (
-                <input
-                  key={s.id}
-                  autoFocus
-                  value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
-                  onBlur={() => commitRename(s.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") commitRename(s.id);
-                    if (e.key === "Escape") setEditingId(null);
-                  }}
-                  className="block w-full truncate rounded-lg border border-accent bg-surface px-2 py-1.5 text-sm text-ink outline-none"
-                />
-              ) : (
-                <Link
-                  key={s.id}
-                  href={`/chat/${activeAvatarId}?session=${s.id}`}
-                  onDoubleClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setEditingId(s.id);
-                    setEditValue(s.title);
-                  }}
-                  title="双击重命名"
-                  className={clsx(
-                    "block truncate rounded-lg px-2 py-1.5 text-sm text-ink-muted hover:bg-paper",
-                    pathname === `/chat/${activeAvatarId}` && "text-ink"
-                  )}
-                >
-                  {s.title}
-                </Link>
-              )
-            )}
-          </div>
-        )}
       </nav>
 
       <div className="border-t border-line px-3 py-3">
