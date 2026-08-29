@@ -128,9 +128,10 @@ export default function Sidebar({
               </Link>
 
               {/* This avatar's own chat history, nested right under it
-                 instead of in one shared section -- so it's obvious which
-                 conversations belong to which avatar even before you click
-                 into one. */}
+                 instead of in one shared section. Collapsed for every
+                 avatar except the one you're currently in -- click an
+                 avatar to open it, which also expands its chat list. */}
+              {isActive && (
               <div className="ml-4 mt-1 space-y-0.5 border-l border-line pl-2">
                 {avatarSessions.map((s) =>
                   editingId === s.id ? (
@@ -174,6 +175,7 @@ export default function Sidebar({
                   + New Chat
                 </button>
               </div>
+              )}
             </div>
           );
         })}
