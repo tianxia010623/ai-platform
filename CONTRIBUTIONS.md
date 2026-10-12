@@ -1,4 +1,4 @@
-# My Contributions
+# Team Contributions
 
 Team project (myself + one teammate). This document covers only the parts I
 personally designed and built, written to stand on its own — pull chunks straight
