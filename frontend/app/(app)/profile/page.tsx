@@ -1,15 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import RequireAuth from "@/components/RequireAuth";
-import Sidebar from "@/components/Sidebar";
+import PageHeader from "@/components/PageHeader";
+import PageScroll from "@/components/PageScroll";
+import UserBadge from "@/components/UserBadge";
 import * as api from "@/lib/api";
 import { useAuth } from "@/lib/auth-context";
+import { errorMessage } from "@/lib/errors";
 
-const inputClass =
-  "w-full rounded-lg border border-line bg-paper/40 px-3 py-2.5 text-sm text-ink outline-none focus:border-accent focus:bg-white focus:ring-2 focus:ring-accent/20";
+const inputClass = "field";
 
-function ProfileContent() {
+export default function ProfilePage() {
   const { user, updateUser } = useAuth();
 
   const [username, setUsername] = useState("");
@@ -48,7 +49,7 @@ function ProfileContent() {
       updateUser(updated);
       setProfileMessage({ type: "ok", text: "Profile updated." });
     } catch (err) {
-      setProfileMessage({ type: "error", text: err instanceof Error ? err.message : "Something went wrong." });
+      setProfileMessage({ type: "error", text: errorMessage(err) });
     } finally {
       setSavingProfile(false);
     }
@@ -79,22 +80,31 @@ function ProfileContent() {
       setConfirmPassword("");
       setPasswordMessage({ type: "ok", text: "Password changed." });
     } catch (err) {
-      setPasswordMessage({ type: "error", text: err instanceof Error ? err.message : "Something went wrong." });
+      setPasswordMessage({ type: "error", text: errorMessage(err) });
     } finally {
       setSavingPassword(false);
     }
   }
 
-  return (
-    <div className="flex h-screen bg-white">
-      <Sidebar />
-      <main className="flex-1 overflow-y-auto px-8 py-8">
-        <div className="mx-auto max-w-lg">
-          <h1 className="mb-1 text-2xl font-semibold text-ink">Your Profile</h1>
-          <p className="mb-8 text-sm text-ink-muted">Update your account details.</p>
+  const joined = user ? new Date(user.created_at).toLocaleDateString(undefined, { year: "numeric", month: "long" }) : "";
 
-          <section className="mb-8 rounded-xl border border-line p-6">
-            <h2 className="mb-4 text-sm font-medium text-ink">Account info</h2>
+  return (
+    <PageScroll width="max-w-lg">
+          <PageHeader eyebrow="Account" title="Your Profile" subtitle="Update your account details." />
+
+          {user && (
+            <section className="card mb-6 flex animate-fade-in items-center gap-4 p-5">
+              <UserBadge name={user.username} className="h-14 w-14 text-2xl" />
+              <div className="min-w-0">
+                <p className="truncate font-display text-xl font-semibold text-ink">{user.username}</p>
+                <p className="truncate text-sm text-ink-muted">{user.email}</p>
+                {joined && <p className="mt-0.5 text-xs text-ink-muted">Member since {joined}</p>}
+              </div>
+            </section>
+          )}
+
+          <section className="card mb-6 p-6">
+            <h2 className="mb-4 font-display text-base font-semibold text-ink">Account info</h2>
             <form onSubmit={handleSaveProfile} className="space-y-4">
               <div>
                 <label className="mb-1 block text-xs font-medium text-ink-muted">Username</label>
@@ -111,7 +121,7 @@ function ProfileContent() {
               </div>
 
               {profileMessage && (
-                <p className={`text-sm ${profileMessage.type === "error" ? "text-red-600" : "text-emerald-600"}`}>
+                <p className={`text-sm ${profileMessage.type === "error" ? "text-danger" : "text-success"}`} role="status">
                   {profileMessage.text}
                 </p>
               )}
@@ -119,15 +129,15 @@ function ProfileContent() {
               <button
                 type="submit"
                 disabled={savingProfile}
-                className="rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white transition hover:bg-accent-hover disabled:opacity-50"
+                className="btn-primary"
               >
                 {savingProfile ? "Saving..." : "Save changes"}
               </button>
             </form>
           </section>
 
-          <section className="rounded-xl border border-line p-6">
-            <h2 className="mb-4 text-sm font-medium text-ink">Change password</h2>
+          <section className="card p-6">
+            <h2 className="mb-4 font-display text-base font-semibold text-ink">Change password</h2>
             <form onSubmit={handleChangePassword} className="space-y-4">
               <div>
                 <label className="mb-1 block text-xs font-medium text-ink-muted">Current password</label>
@@ -158,7 +168,7 @@ function ProfileContent() {
               </div>
 
               {passwordMessage && (
-                <p className={`text-sm ${passwordMessage.type === "error" ? "text-red-600" : "text-emerald-600"}`}>
+                <p className={`text-sm ${passwordMessage.type === "error" ? "text-danger" : "text-success"}`} role="status">
                   {passwordMessage.text}
                 </p>
               )}
@@ -166,22 +176,13 @@ function ProfileContent() {
               <button
                 type="submit"
                 disabled={savingPassword}
-                className="rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-white transition hover:bg-accent-hover disabled:opacity-50"
+                className="btn-primary"
               >
                 {savingPassword ? "Saving..." : "Change password"}
               </button>
             </form>
           </section>
-        </div>
-      </main>
-    </div>
+    </PageScroll>
   );
 }
 
-export default function ProfilePage() {
-  return (
-    <RequireAuth>
-      <ProfileContent />
-    </RequireAuth>
-  );
-}
