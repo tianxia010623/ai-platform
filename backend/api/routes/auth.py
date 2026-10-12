@@ -2,12 +2,13 @@ import secrets
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_current_user
 from core.config import settings
 from core.database import get_db
+from core.ratelimit import rate_limit
 from core.security import create_access_token, hash_password, verify_password
 from models.user import User
 from schemas import (
@@ -26,17 +27,34 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 RESET_TOKEN_TTL = timedelta(hours=1)
 
 
-@router.post("/register", response_model=TokenOut)
+def _normalize_email(email: str) -> str:
+    return email.strip().lower()
+
+
+async def _find_by_email(db: AsyncSession, email: str, exclude_id: int | None = None) -> User | None:
+    stmt = select(User).where(func.lower(User.email) == _normalize_email(email))
+    if exclude_id is not None:
+        stmt = stmt.where(User.id != exclude_id)
+    result = await db.execute(stmt)
+    return result.scalars().first()
+
+
+@router.post(
+    "/register",
+    response_model=TokenOut,
+    dependencies=[Depends(rate_limit("register", max_calls=5, window_seconds=300))],
+)
 async def register(data: UserRegister, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(
-        select(User).where((User.username == data.username) | (User.email == data.email))
-    )
+    username = data.username.strip()
+    if await _find_by_email(db, data.email) is not None:
+        raise HTTPException(status_code=400, detail="That email is already registered")
+    result = await db.execute(select(User).where(User.username == username))
     if result.scalar_one_or_none() is not None:
-        raise HTTPException(status_code=400, detail="Username or email already registered")
+        raise HTTPException(status_code=400, detail="That username is already taken")
 
     user = User(
-        username=data.username,
-        email=data.email,
+        username=username,
+        email=_normalize_email(data.email),
         hashed_password=hash_password(data.password),
     )
     db.add(user)
@@ -73,39 +91,41 @@ async def update_profile(
             raise HTTPException(status_code=400, detail="Username already taken")
         current_user.username = data.username
 
-    if data.email and data.email != current_user.email:
-        result = await db.execute(
-            select(User).where(User.email == data.email, User.id != current_user.id)
-        )
-        if result.scalar_one_or_none() is not None:
+    if data.email and _normalize_email(data.email) != _normalize_email(current_user.email):
+        if await _find_by_email(db, data.email, exclude_id=current_user.id) is not None:
             raise HTTPException(status_code=400, detail="Email already registered")
-        current_user.email = data.email
+        current_user.email = _normalize_email(data.email)
 
     await db.commit()
     await db.refresh(current_user)
     return current_user
 
 
-@router.post("/login", response_model=TokenOut)
+@router.post(
+    "/login",
+    response_model=TokenOut,
+    dependencies=[Depends(rate_limit("login", max_calls=10, window_seconds=300))],
+)
 async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(User).where(User.username == data.username))
-    user = result.scalar_one_or_none()
+    user = await _find_by_email(db, data.email)
     if user is None or not verify_password(data.password, user.hashed_password):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password")
 
     token = create_access_token(str(user.id))
     return TokenOut(access_token=token, user=UserOut.model_validate(user))
 
 
-@router.post("/forgot-password")
+@router.post(
+    "/forgot-password",
+    dependencies=[Depends(rate_limit("forgot-password", max_calls=5, window_seconds=900))],
+)
 async def forgot_password(data: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
     """Always returns a generic success message, whether or not the email is
     registered -- this is deliberate: telling an attacker "that email isn't
     registered" is a classic account-enumeration leak. If the email exists,
     a one-time reset link is emailed; the token is single-use and expires
     in an hour."""
-    result = await db.execute(select(User).where(User.email == data.email))
-    user = result.scalar_one_or_none()
+    user = await _find_by_email(db, data.email)
 
     if user is not None:
         token = secrets.token_urlsafe(32)
@@ -126,7 +146,10 @@ async def forgot_password(data: ForgotPasswordRequest, db: AsyncSession = Depend
     return {"message": "If that email is registered, a reset link has been sent."}
 
 
-@router.post("/reset-password")
+@router.post(
+    "/reset-password",
+    dependencies=[Depends(rate_limit("reset-password", max_calls=10, window_seconds=900))],
+)
 async def reset_password(data: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.reset_token == data.token))
     user = result.scalar_one_or_none()

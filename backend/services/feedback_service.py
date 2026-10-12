@@ -18,9 +18,18 @@ async def _get_variant_for_message(db: AsyncSession, message_id: int) -> PromptV
     return result.scalar_one_or_none()
 
 
+async def _owned_assistant_message(db: AsyncSession, user_id: int, message_id: int) -> Message | None:
+    result = await db.execute(
+        select(Message)
+        .join(ChatSession, ChatSession.id == Message.session_id)
+        .where(Message.id == message_id, ChatSession.user_id == user_id, Message.role == "assistant")
+    )
+    return result.scalar_one_or_none()
+
+
 async def submit_feedback(
     db: AsyncSession, user_id: int, message_id: int, rating: int
-) -> MessageFeedback:
+) -> MessageFeedback | None:
     """Create or update a user's feedback rating for a given message (upsert).
 
     rating is 1 (thumbs up), -1 (thumbs down), or 0 (un-voting — the user
@@ -31,7 +40,12 @@ async def submit_feedback(
     reverts the old reward (if the old rating was 1/-1) before applying the
     new one, so a variant's stats always reflect the user's latest opinion
     rather than double-counting or treating "un-voted" as a thumbs down.
+
+    Returns None if the message doesn't exist, isn't the user's own, or isn't
+    an assistant reply -- otherwise anyone could skew another user's stats.
     """
+    if await _owned_assistant_message(db, user_id, message_id) is None:
+        return None
     result = await db.execute(
         select(MessageFeedback).where(
             MessageFeedback.message_id == message_id,

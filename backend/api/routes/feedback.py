@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.deps import get_current_user
@@ -17,9 +17,12 @@ async def submit_feedback(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    return await feedback_service.submit_feedback(
-        db, current_user.id, message_id, data.rating
-    )
+    record = await feedback_service.submit_feedback(db, current_user.id, message_id, data.rating)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Message not found")
+    return record
+
+
 @router.get("/summary", response_model=list[FeedbackSummaryOut])
 async def get_feedback_summary(
     db: AsyncSession = Depends(get_db),

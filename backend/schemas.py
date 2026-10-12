@@ -11,7 +11,7 @@ class UserRegister(BaseModel):
 
 
 class UserLogin(BaseModel):
-    username: str
+    email: EmailStr
     password: str
 
 
@@ -61,7 +61,7 @@ class AvatarCreate(BaseModel):
 
 
 class AvatarUpdate(BaseModel):
-    name: str | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=100)
     description: str | None = None
     personality: str | None = None
     speaking_style: str | None = None
@@ -107,12 +107,17 @@ class ChatSessionOut(BaseModel):
         from_attributes = True
 
 
+class AttachedFileOut(BaseModel):
+    filename: str
+    kind: str | None = None
+
+
 class MessageOut(BaseModel):
     id: int
     session_id: int
     role: str
     content: str
-    attached_files: list[dict]
+    attached_files: list[AttachedFileOut]
     prompt_variant_id: int | None
     created_at: datetime
     # The current user's own feedback on this message, if any (1 / -1 / None).
