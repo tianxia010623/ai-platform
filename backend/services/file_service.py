@@ -1,16 +1,13 @@
 import base64
-import mimetypes
+import io
 import re
 from pathlib import Path
 
 import fitz  # PyMuPDF
+from PIL import Image
 
-CODE_EXTENSIONS = {
-    ".py", ".js", ".ts", ".tsx", ".jsx", ".java", ".c", ".cpp", ".h", ".hpp",
-    ".go", ".rs", ".rb", ".php", ".cs", ".swift", ".kt", ".sql", ".sh",
-    ".json", ".yaml", ".yml", ".md", ".txt", ".html", ".css", ".xml",
-}
-IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+from core.uploads import CHAT_IMAGE_EXTENSIONS, IMAGE_MEDIA_TYPES
+
 PDF_EXTENSIONS = {".pdf"}
 
 MAX_PDF_CHARS = 3000
@@ -22,14 +19,19 @@ MAX_CODE_CHARS = 8000
 # keep a lot more of the document without bloating every future prompt.
 MAX_INDEX_CHARS = 20000
 
+# The API rejects images over 5 MB (base64 grows data by 4/3) and downsizes
+# anything past ~1568px on the long edge anyway, so shrink before sending.
+MAX_IMAGE_EDGE = 1568
+MAX_IMAGE_BYTES = 3_700_000
+
 
 def classify_file(filename: str) -> str:
     ext = Path(filename).suffix.lower()
     if ext in PDF_EXTENSIONS:
         return "pdf"
-    if ext in IMAGE_EXTENSIONS:
+    if ext in CHAT_IMAGE_EXTENSIONS:
         return "image"
-    return "code"
+    return "text"
 
 
 def _fix_glued_words(text: str) -> str:
@@ -48,9 +50,7 @@ def _fix_glued_words(text: str) -> str:
 def _extract_pdf_raw(file_path: Path, max_chars: int) -> str:
     """Extracts text page by page via PyMuPDF, which -- unlike the PyPDF2
     extractor this used to use -- reliably preserves word-boundary spaces
-    on multi-column academic-paper layouts. (PyPDF2 would turn "A two-stage
-    approach" into "Atwo-stage approach"; that glued text made for garbled,
-    low-similarity RAG embeddings -- see rag_service.py.)"""
+    on multi-column academic-paper layouts."""
     doc = fitz.open(str(file_path))
     try:
         parts = []
@@ -69,47 +69,70 @@ def _extract_pdf_raw(file_path: Path, max_chars: int) -> str:
 def extract_pdf_text(file_path: Path) -> str:
     try:
         return _extract_pdf_raw(file_path, MAX_PDF_CHARS)
-    except Exception as exc:  # noqa: BLE001
-        return f"[Could not extract PDF text: {exc}]"
+    except Exception:  # noqa: BLE001
+        return "[The PDF's text could not be extracted -- it may be scanned or encrypted.]"
 
 
-def read_code_file(file_path: Path) -> str:
+def read_text_file(file_path: Path) -> str:
     try:
-        text = file_path.read_text(encoding="utf-8", errors="replace")
-        return text[:MAX_CODE_CHARS]
-    except Exception as exc:  # noqa: BLE001
-        return f"[Could not read file: {exc}]"
+        return file_path.read_text(encoding="utf-8", errors="replace")[:MAX_CODE_CHARS]
+    except OSError:
+        return "[The file could not be read.]"
 
 
-def image_to_base64_block(file_path: Path) -> dict:
-    media_type = mimetypes.guess_type(str(file_path))[0] or "image/png"
-    data = base64.standard_b64encode(file_path.read_bytes()).decode("utf-8")
+def attachment_text(file_path: Path, original_filename: str) -> str | None:
+    """Text form of a non-image attachment as it is shown to the model, or
+    None for images. Stored on the message so later turns keep it."""
+    kind = classify_file(original_filename)
+    if kind == "image":
+        return None
+    if kind == "pdf":
+        return f"[Attached PDF: {original_filename}]\n{extract_pdf_text(file_path)}"
+    return f"[Attached file: {original_filename}]\n```\n{read_text_file(file_path)}\n```"
+
+
+def _prepare_image(file_path: Path) -> tuple[bytes, str]:
+    data = file_path.read_bytes()
+    media_type = IMAGE_MEDIA_TYPES.get(file_path.suffix.lower(), "image/png")
+    with Image.open(io.BytesIO(data)) as img:
+        too_big = max(img.size) > MAX_IMAGE_EDGE or len(data) > MAX_IMAGE_BYTES
+        if not too_big:
+            return data, media_type
+        img.thumbnail((MAX_IMAGE_EDGE, MAX_IMAGE_EDGE))
+        out = io.BytesIO()
+        if img.mode in ("RGBA", "LA", "P"):
+            img.save(out, format="PNG", optimize=True)
+            media_type = "image/png"
+        else:
+            img.convert("RGB").save(out, format="JPEG", quality=85)
+            media_type = "image/jpeg"
+        result = out.getvalue()
+        if len(result) > MAX_IMAGE_BYTES:
+            out = io.BytesIO()
+            img.convert("RGB").save(out, format="JPEG", quality=70)
+            result, media_type = out.getvalue(), "image/jpeg"
+        return result, media_type
+
+
+def image_block(file_path: Path) -> dict | None:
+    try:
+        data, media_type = _prepare_image(file_path)
+    except (OSError, ValueError):
+        return None
     return {
         "type": "image",
-        "source": {"type": "base64", "media_type": media_type, "data": data},
+        "source": {
+            "type": "base64",
+            "media_type": media_type,
+            "data": base64.standard_b64encode(data).decode("utf-8"),
+        },
     }
 
 
-def build_content_blocks_for_file(file_path: Path, original_filename: str) -> list[dict]:
-    """Convert a stored file into Anthropic Messages API content blocks."""
-    kind = classify_file(original_filename)
-
-    if kind == "image":
-        return [image_to_base64_block(file_path)]
-
-    if kind == "pdf":
-        text = extract_pdf_text(file_path)
-        return [{"type": "text", "text": f"[Attached PDF: {original_filename}]\n{text}"}]
-
-    # code / plain text
-    text = read_code_file(file_path)
-    return [{"type": "text", "text": f"[Attached file: {original_filename}]\n```\n{text}\n```"}]
-
-
 def extract_full_text(file_path: Path, original_filename: str) -> str | None:
-    """Extracts as much text as reasonable from a PDF or code/text file for
-    RAG indexing (see rag_service.index_file_for_avatar). Returns None for
-    file types with no meaningful text to index (currently just images)."""
+    """Extracts as much text as reasonable from a PDF or text file for RAG
+    indexing (see rag_service.index_file_for_avatar). Returns None for file
+    types with no meaningful text to index (images)."""
     kind = classify_file(original_filename)
     if kind == "image":
         return None
@@ -120,5 +143,5 @@ def extract_full_text(file_path: Path, original_filename: str) -> str | None:
             return None
     try:
         return file_path.read_text(encoding="utf-8", errors="replace")[:MAX_INDEX_CHARS]
-    except Exception:  # noqa: BLE001
+    except OSError:
         return None

@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -6,11 +7,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.routes import auth, avatars, chat, feedback, mastery, prompt_variants
 from core.config import settings
 from core.database import init_db
+from services import rag_service
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s [%(name)s] %(message)s")
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    rag_service.warmup_in_background()
     yield
 
 
@@ -34,4 +39,4 @@ app.include_router(prompt_variants.router)
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok"}
+    return {"status": "ok", "file_search": rag_service.model_status()}

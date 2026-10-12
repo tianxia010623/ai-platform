@@ -1,9 +1,14 @@
+import json
+import logging
+
 from anthropic import AsyncAnthropic
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import settings
 from models.topic_mastery import TopicMastery
+
+log = logging.getLogger(__name__)
 
 EMA_ALPHA = 0.3
 
@@ -58,27 +63,36 @@ async def analyze_and_update_mastery(
         "Identify which of these candidate topics (only from the given list, verbatim) were "
         "actually touched on in this exchange, and estimate how well the USER demonstrated "
         "understanding of each (not the assistant). If a topic wasn't discussed, omit it.\n\n"
+        "Call the record_topic_mastery tool exactly once with your assessment (an empty "
+        "topics list if none apply); do not answer in plain text.\n\n"
         f"User: {user_message}\n\nAssistant: {assistant_message}"
     )
 
     try:
+        # Forced tool_choice ("tool"/"any") is rejected by current models, so
+        # offer the one tool with tool_choice "auto", tell the model to call
+        # it, and use strict mode so whatever it sends matches the schema.
         response = await client.messages.create(
-            model=settings.anthropic_model,
-            max_tokens=1024,
+            model=settings.mastery_model,
+            max_tokens=4096,
             tools=[
                 {
                     "name": "record_topic_mastery",
                     "description": "Record the topics touched on in this exchange and the user's demonstrated mastery of each.",
                     "input_schema": MASTERY_SCHEMA,
+                    "strict": True,
                 }
             ],
-            tool_choice={"type": "tool", "name": "record_topic_mastery"},
+            tool_choice={"type": "auto"},
             messages=[{"role": "user", "content": analysis_prompt}],
+            extra_body={"output_config": {"effort": "low"}},
         )
         tool_use = next((b for b in response.content if b.type == "tool_use"), None)
         parsed = tool_use.input if tool_use else {}
+        if isinstance(parsed, str):
+            parsed = json.loads(parsed)
     except Exception as exc:  # noqa: BLE001
-        print(f"[mastery_service] analyze_and_update_mastery failed: {exc}")
+        log.warning("analyze_and_update_mastery failed: %s", exc)
         return []
 
     updated: list[TopicMastery] = []

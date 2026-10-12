@@ -1,4 +1,3 @@
-import uuid
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -9,9 +8,19 @@ from api.deps import get_current_user
 from core.ai_client import anthropic_client
 from core.config import settings
 from core.database import get_db
+from core.uploads import (
+    CHAT_ALLOWED_EXTENSIONS,
+    CHAT_IMAGE_EXTENSIONS,
+    delete_quietly,
+    detect_image_ext,
+    new_stored_name,
+    read_limited,
+    write_file,
+)
 from models.user import User
 from schemas import ChatSessionCreate, ChatSessionOut, ChatSessionUpdate, MessageOut
-from services import avatar_service, chat_service, feedback_service
+from services import avatar_service, chat_service, cleanup_service, feedback_service
+from services.chat_service import SavedUpload
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -50,6 +59,19 @@ async def update_session(
     return session
 
 
+@router.delete("/sessions/{session_id}")
+async def delete_session(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    session = await chat_service.get_session(db, current_user.id, session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    await cleanup_service.delete_session(db, session)
+    return {"ok": True}
+
+
 @router.get("/sessions/{session_id}/messages", response_model=list[MessageOut])
 async def get_session_messages(
     session_id: int,
@@ -68,19 +90,51 @@ async def get_session_messages(
     return messages
 
 
-def _save_upload(file: UploadFile) -> tuple[Path, str]:
-    ext = Path(file.filename or "").suffix
-    stored_name = f"{uuid.uuid4().hex}{ext}"
-    dest = settings.chat_files_dir / stored_name
-    with open(dest, "wb") as f:
-        f.write(file.file.read())
-    return dest, file.filename or stored_name
+async def _save_chat_uploads(files: list[UploadFile]) -> list[SavedUpload]:
+    """Validate and store a message's attachments. Nothing is kept if any
+    file is rejected."""
+    files = [f for f in files if f.filename]
+    if len(files) > settings.max_chat_files_per_message:
+        raise HTTPException(
+            status_code=400,
+            detail=f"You can attach up to {settings.max_chat_files_per_message} files per message.",
+        )
+
+    saved: list[SavedUpload] = []
+    try:
+        for f in files:
+            original = Path(f.filename or "").name
+            ext = Path(original).suffix.lower()
+            if ext not in CHAT_ALLOWED_EXTENSIONS:
+                raise HTTPException(status_code=400, detail=f"“{original}” isn't a supported file type.")
+            data = await read_limited(f, settings.max_chat_file_bytes)
+            if ext in CHAT_IMAGE_EXTENSIONS:
+                detected = detect_image_ext(data)
+                if detected is None:
+                    raise HTTPException(status_code=400, detail=f"“{original}” isn't a valid image.")
+                ext, kind = detected, "image"
+            elif ext == ".pdf":
+                if not data.startswith(b"%PDF"):
+                    raise HTTPException(status_code=400, detail=f"“{original}” isn't a valid PDF.")
+                kind = "pdf"
+            else:
+                kind = "text"
+            stored = new_stored_name(ext)
+            path = settings.chat_files_dir / stored
+            await write_file(path, data)
+            saved.append(SavedUpload(path=path, original_filename=original, stored_name=stored, kind=kind))
+    except Exception:
+        for s in saved:
+            delete_quietly(s.path)
+        raise
+    return saved
 
 
 @router.post("/stream")
 async def stream_chat(
     session_id: int = Form(...),
     message: str = Form(""),
+    regenerate: bool = Form(False),
     files: list[UploadFile] = File(default=[]),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -93,22 +147,20 @@ async def stream_chat(
     if avatar is None:
         raise HTTPException(status_code=404, detail="Avatar not found")
 
-    saved_files: list[tuple[Path, str]] = []
-    attached_meta: list[dict] = []
-    for f in files:
-        if f.filename:
-            path, original_name = _save_upload(f)
-            saved_files.append((path, original_name))
-            attached_meta.append({"filename": original_name})
+    if regenerate:
+        uploads: list[SavedUpload] = []
+    else:
+        uploads = await _save_chat_uploads(files)
+        if not message.strip() and not uploads:
+            raise HTTPException(status_code=400, detail="Message is empty.")
 
     generator = chat_service.stream_chat_response(
-        db=db,
         client=anthropic_client,
-        session=session,
-        avatar=avatar,
-        user_text=message,
-        files=saved_files,
-        attached_files_meta=attached_meta,
+        session_id=session.id,
+        avatar_id=avatar.id,
+        user_text=message.strip(),
+        uploads=uploads,
+        regenerate=regenerate,
     )
 
     return StreamingResponse(
