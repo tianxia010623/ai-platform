@@ -30,6 +30,9 @@ class DocumentChunk(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     avatar_id: Mapped[int] = mapped_column(ForeignKey("avatars.id"), nullable=False, index=True)
     source_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    # sha256 of the indexed text, so re-uploading the same file to the same
+    # avatar doesn't index (and later retrieve) duplicate chunks.
+    source_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     chunk_index: Mapped[int] = mapped_column(Integer, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     # Stored as a JSON-encoded list[float] rather than a dedicated vector
