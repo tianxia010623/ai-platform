@@ -11,6 +11,10 @@ see [`CONTRIBUTIONS.md`](./CONTRIBUTIONS.md) for what I personally designed and 
 
 ![Prompt A/B testing demo](./docs/demo/avatar-ai-highlight.gif)
 
+> **What's new in v2.0:** email login, security fixes, Markdown chat with stop/regenerate,
+> editable avatars, deletable chats, mobile layout, and more — see
+> [docs/UPDATE_v2.0.md](./docs/UPDATE_v2.0.md) and the [changelog](./docs/CHANGELOG.md).
+
 ## What it does
 
 - **Custom AI personas.** Define a name, personality, speaking style, expertise, and
@@ -69,17 +73,20 @@ The full interactive report is at
 ```
 backend/
   main.py                 FastAPI app entrypoint
-  core/                    config, DB engine + idempotent SQLite migrations, security (JWT)
+  core/                    config, DB engine, upload validation, rate limiting, security (JWT)
+  migrations/              Alembic migrations (applied automatically on startup)
+  tests/                   pytest suite (no network, temp DB)
   models/                  User, Avatar, ChatSession, Message, PromptVariant, DocumentChunk, TopicMastery
   services/                chat streaming, RAG retrieval, bandit selection, feedback, email
   api/routes/              auth, avatars, chat, feedback, prompt-variants, mastery
   scripts/simulate_bandit.py   Thompson Sampling vs. epsilon-greedy vs. random simulation
 frontend/
-  app/                     pages: login, signup, forgot/reset-password, avatar/new,
-                            chat/[avatarId], avatar/[avatarId]/prompt-variants,
-                            feedback, dashboard, profile
-  components/              chat UI, sidebar (per-avatar collapsible chat history), auth guard
-  lib/                     API client, auth context, shared types
+  app/                     login, forgot/reset-password, and (app)/ -- the signed-in
+                            area sharing one layout + sidebar: home, avatar/new,
+                            avatar/[id]/edit, avatar/[id]/prompt-variants,
+                            chat/[avatarId], dashboard, feedback, profile
+  components/              chat UI (Markdown replies), sidebar, icons, dialogs
+  lib/                     API client, auth + app-data contexts, SSE parser, types
 docs/
   PROMPT_VARIANTS.md        design doc for the bandit system
   RAG.md                    design doc for the retrieval pipeline
@@ -108,8 +115,12 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 cp .env.example .env
-# edit .env: set ANTHROPIC_API_KEY=sk-ant-...
+# edit .env:
+#   ANTHROPIC_API_KEY=sk-ant-...
+#   JWT_SECRET_KEY=<required -- the server refuses to start without a strong one>
+#     generate: python -c "import secrets; print(secrets.token_urlsafe(48))"
 # optional: RESEND_API_KEY=re_... for password-reset email
+# optional: HF_ENDPOINT=https://hf-mirror.com if huggingface.co is unreachable
 ```
 
 Run the API server:
@@ -118,10 +129,20 @@ Run the API server:
 uvicorn main:app --reload --port 8000
 ```
 
-On first run this creates `backend/app.db` (SQLite) and the `uploads/` folders
-automatically; all later schema changes run as idempotent `ALTER TABLE`
-migrations, so pulling new code never requires deleting your local database.
+On startup the server applies any pending Alembic migrations to `backend/app.db`
+(creating it on first run), so pulling new code never requires deleting your local
+database. Databases from before Alembic was introduced are detected and upgraded
+in place. It also starts loading the file-search embedding model in the
+background (~470 MB download the first time); `GET /api/health` reports its state.
 Interactive API docs: `http://localhost:8000/docs`.
+
+Run the tests (they use a temporary database and a fake Claude client -- no API
+calls, nothing touches your data):
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
 
 ## 2. Frontend setup
 
@@ -137,23 +158,27 @@ cp .env.local.example .env.local
 npm run dev
 ```
 
-Open `http://localhost:3000` — you'll land on `/login`. Sign up, then create your
-first avatar from the sidebar.
+Checks: `npm run typecheck` and `npm test` (unit tests via Vitest).
+
+Open `http://localhost:3000` — you'll land on `/login`. Sign up, log in with your
+email, then create your first avatar.
 
 ## Using the app
 
-1. **Sign up / log in.** Accounts are local to your SQLite database. Forgot your
+1. **Sign up, then log in with your email.** Accounts are local to your SQLite database. Forgot your
    password? Use the link on the login page (needs `RESEND_API_KEY` configured).
 2. **Create an avatar** (`/avatar/new`) — name, personality, speaking style,
-   expertise, topic tags, optional image.
-3. **Chat** (`/chat/[avatarId]`) — streams token-by-token. Attach a PDF, image, or
-   code file with the paperclip button; PDFs are chunked and embedded so later
-   questions can retrieve and cite them, even in a different language than the
-   document.
-4. **Tune the prompt** (`Prompt Variants`, top-right of a chat) — add variants to an
-   avatar's system prompt and let the bandit find the one users respond to best.
-5. **Rate responses** with 👍/👎 — check `/feedback` for the aggregate approval rate
-   per avatar.
+   expertise, topic tags, optional image. Edit or delete it later from its card.
+3. **Chat** (`/chat/[avatarId]`) — replies stream in and render as Markdown; stop,
+   regenerate, or copy them. Attach PDFs, images, or code/text files (button, drag
+   and drop, or paste; up to 5 files, 20 MB each); text files and PDFs are chunked
+   and embedded so later questions can retrieve them, even in a different language.
+   Chats are created when you send the first message; rename or delete them from
+   the sidebar.
+4. **Tune the prompt** (Labs → avatar edit page → Prompt experiments) — add
+   variants to an avatar's system prompt and let the bandit find the best one.
+5. **Rate responses** with thumbs up/down — Labs → Feedback Insights shows the
+   approval rate per avatar.
 6. **`/profile`** — update your username/email or change your password.
 7. **`/dashboard`** — track topic mastery across your conversations.
 
@@ -162,5 +187,9 @@ first avatar from the sidebar.
 - All data is local: SQLite at `backend/app.db`, uploaded files under
   `backend/uploads/`. Nothing leaves the machine except calls to the Anthropic API
   (for chat) and Resend (only when a password reset is requested).
-- The Anthropic model is configurable via `ANTHROPIC_MODEL` in `backend/.env`.
+- The chat model is `ANTHROPIC_MODEL` (default `claude-sonnet-5-5`); topic-mastery
+  grading runs in the background on the cheaper `MASTERY_MODEL`
+  (default `claude-haiku-5-5`). Prompt caching is on, and very long chats drop
+  their oldest turns from the request.
+- Login and sign-up are rate limited per IP (in memory, single process).
 - JWTs are stored in `localStorage` and expire after 7 days by default.
