@@ -32,7 +32,7 @@ export interface Message {
   session_id: number;
   role: "user" | "assistant";
   content: string;
-  attached_files: { filename: string }[];
+  attached_files: { filename: string; kind?: string | null }[];
   created_at: string;
   user_feedback: number | null;
 }

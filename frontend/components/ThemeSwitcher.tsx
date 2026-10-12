@@ -1,47 +1,46 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-const STORAGE_KEY = "ai-avatars-theme";
-
-const THEMES = [
-  { id: "matinee", label: "Matinee", swatch: "#EEF0F4" },
-  { id: "midnight", label: "Midnight", swatch: "#14171F" },
-  { id: "sepia", label: "Sepia", swatch: "#F1E7D6" },
-];
+import clsx from "clsx";
+import { THEMES, THEME_STORAGE_KEY } from "@/lib/theme";
 
 export default function ThemeSwitcher() {
   const [theme, setTheme] = useState("matinee");
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      setTheme(stored);
-      document.documentElement.setAttribute("data-theme", stored);
-    }
+    // The inline script in app/layout.tsx already applied it before paint;
+    // this only syncs the selected swatch.
+    const current = document.documentElement.getAttribute("data-theme");
+    if (current) setTheme(current);
   }, []);
 
   function selectTheme(id: string) {
     setTheme(id);
     document.documentElement.setAttribute("data-theme", id);
-    localStorage.setItem(STORAGE_KEY, id);
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, id);
+    } catch {
+      // storage unavailable (private mode) -- theme still applies this visit
+    }
   }
 
   return (
-    <div className="flex items-center gap-2 px-2 py-2">
-      <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-ink-muted">
-        Theme
-      </span>
+    <div className="flex items-center gap-2 px-2 py-2" role="radiogroup" aria-label="Theme">
+      <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-ink-muted">Theme</span>
       <div className="flex gap-1.5">
         {THEMES.map((t) => (
           <button
             key={t.id}
             type="button"
+            role="radio"
+            aria-checked={theme === t.id}
+            aria-label={t.label}
             onClick={() => selectTheme(t.id)}
             title={t.label}
-            className={`h-5 w-5 rounded-full border-2 transition ${
+            className={clsx(
+              "h-5 w-5 rounded-full border-2 transition",
               theme === t.id ? "scale-110 border-accent" : "border-line"
-            }`}
+            )}
             style={{ backgroundColor: t.swatch }}
           />
         ))}

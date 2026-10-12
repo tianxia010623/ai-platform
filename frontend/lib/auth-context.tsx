@@ -9,7 +9,7 @@ import type { User } from "./types";
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
-  login: (username: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   register: (username: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   /** Update the cached user profile (e.g. after editing it on /profile)
@@ -30,23 +30,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const token = getToken();
     const storedUser = typeof window !== "undefined" ? localStorage.getItem(USER_KEY) : null;
     if (token && storedUser) {
-      setUser(JSON.parse(storedUser));
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch {
+        localStorage.removeItem(USER_KEY);
+      }
+      // Refresh the cached profile (e.g. a username changed elsewhere); a
+      // stale or revoked token is handled by api.ts's 401 redirect.
+      api
+        .getMe()
+        .then((fresh) => {
+          localStorage.setItem(USER_KEY, JSON.stringify(fresh));
+          setUser(fresh);
+        })
+        .catch(() => {});
     }
     setLoading(false);
   }, []);
 
-  async function handleLogin(username: string, password: string) {
-    const res = await api.login(username, password);
+  async function handleLogin(email: string, password: string) {
+    const res = await api.login(email, password);
     setToken(res.access_token);
     localStorage.setItem(USER_KEY, JSON.stringify(res.user));
     setUser(res.user);
   }
 
+  // Registration only creates the account; the user is sent back to the
+  // login form to sign in explicitly, so the returned token is not kept.
   async function handleRegister(username: string, email: string, password: string) {
-    const res = await api.register(username, email, password);
-    setToken(res.access_token);
-    localStorage.setItem(USER_KEY, JSON.stringify(res.user));
-    setUser(res.user);
+    await api.register(username, email, password);
   }
 
   function handleLogout() {

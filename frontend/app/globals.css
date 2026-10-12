@@ -1,18 +1,20 @@
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* Fonts are self-hosted via @fontsource (imported in app/layout.tsx), so the
+   app makes no requests to Google Fonts -- which is slow or blocked in some
+   regions and used to cause a flash of fallback text. */
 :root {
-  --font-display: "Fraunces", serif;
-  --font-sans: "Inter", sans-serif;
-  --font-mono: "JetBrains Mono", monospace;
+  --font-display: "Fraunces Variable", Georgia, serif;
+  --font-sans: "Inter Variable", "PingFang SC", "Microsoft YaHei", Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
   /* Matinee (default) */
   --color-accent: 47 111 94;
   --color-accent-hover: 36 89 74;
   --color-accent-light: 227 238 234;
+  --color-on-accent: 255 255 255;
   --color-accent2: 185 139 46;
   --color-accent2-light: 245 235 214;
   --color-ink: 20 23 31;
@@ -20,12 +22,15 @@
   --color-paper: 238 240 244;
   --color-surface: 255 255 255;
   --color-line: 218 223 230;
+  --color-danger: 200 40 40;
+  --color-success: 34 128 84;
 }
 
 [data-theme="midnight"] {
   --color-accent: 79 191 163;
   --color-accent-hover: 61 168 141;
   --color-accent-light: 30 59 52;
+  --color-on-accent: 12 30 25;
   --color-accent2: 224 177 90;
   --color-accent2-light: 58 47 22;
   --color-ink: 237 239 243;
@@ -33,19 +38,24 @@
   --color-paper: 20 23 31;
   --color-surface: 27 31 41;
   --color-line: 43 48 60;
+  --color-danger: 248 113 113;
+  --color-success: 74 222 128;
 }
 
 [data-theme="sepia"] {
   --color-accent: 140 63 45;
   --color-accent-hover: 110 47 33;
   --color-accent-light: 241 220 210;
+  --color-on-accent: 255 255 255;
   --color-accent2: 107 122 58;
   --color-accent2-light: 231 234 211;
   --color-ink: 43 33 24;
   --color-ink-muted: 122 108 88;
   --color-paper: 241 231 214;
-  --color-surface: 255 255 255;
+  --color-surface: 255 253 248;
   --color-line: 227 214 192;
+  --color-danger: 176 42 42;
+  --color-success: 52 115 60;
 }
 
 html,
@@ -58,6 +68,133 @@ body {
   color: rgb(var(--color-ink));
   font-family: var(--font-sans);
   transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+@layer components {
+  .field {
+    @apply w-full rounded-lg border border-line bg-paper/40 px-3 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-muted/70 focus:border-accent focus:bg-surface focus:ring-2 focus:ring-accent/20;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-on-accent transition hover:bg-accent-hover disabled:opacity-50;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg border border-line bg-surface px-4 py-2.5 text-sm font-medium text-ink transition hover:bg-paper disabled:opacity-50;
+  }
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-lg bg-danger px-4 py-2.5 text-sm font-medium text-on-accent transition hover:opacity-90 disabled:opacity-50;
+  }
+  .icon-btn {
+    @apply inline-flex h-8 w-8 items-center justify-center rounded-lg text-ink-muted transition hover:bg-paper hover:text-ink disabled:opacity-40;
+  }
+  .eyebrow {
+    @apply font-mono text-[11px] uppercase tracking-[0.2em] text-accent2;
+  }
+  .card {
+    @apply rounded-2xl border border-line bg-surface;
+  }
+}
+
+/* Rendered Markdown in assistant replies. */
+.prose-chat {
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.prose-chat > :first-child {
+  margin-top: 0;
+}
+.prose-chat > :last-child {
+  margin-bottom: 0;
+}
+.prose-chat p,
+.prose-chat ul,
+.prose-chat ol,
+.prose-chat pre,
+.prose-chat blockquote,
+.prose-chat table {
+  margin: 0.6em 0;
+}
+.prose-chat h1,
+.prose-chat h2,
+.prose-chat h3,
+.prose-chat h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 1em 0 0.4em;
+}
+.prose-chat h1 {
+  font-size: 1.3em;
+}
+.prose-chat h2 {
+  font-size: 1.18em;
+}
+.prose-chat h3,
+.prose-chat h4 {
+  font-size: 1.05em;
+}
+.prose-chat ul {
+  list-style: disc;
+  padding-left: 1.35em;
+}
+.prose-chat ol {
+  list-style: decimal;
+  padding-left: 1.45em;
+}
+.prose-chat li + li {
+  margin-top: 0.2em;
+}
+.prose-chat a {
+  color: rgb(var(--color-accent));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.prose-chat strong {
+  font-weight: 600;
+}
+.prose-chat blockquote {
+  border-left: 3px solid rgb(var(--color-line));
+  padding-left: 0.8em;
+  color: rgb(var(--color-ink-muted));
+}
+.prose-chat hr {
+  border-color: rgb(var(--color-line));
+  margin: 1em 0;
+}
+.prose-chat :not(pre) > code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: rgb(var(--color-ink) / 0.07);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+}
+.prose-chat pre code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+}
+.prose-chat table {
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  font-size: 0.92em;
+}
+.prose-chat th,
+.prose-chat td {
+  border: 1px solid rgb(var(--color-line));
+  padding: 0.35em 0.6em;
+  text-align: left;
+}
+.prose-chat th {
+  background: rgb(var(--color-ink) / 0.04);
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 ::-webkit-scrollbar {
