@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import clsx from "clsx";
-import RequireAuth from "@/components/RequireAuth";
-import Sidebar from "@/components/Sidebar";
+import PageScroll from "@/components/PageScroll";
+import { ThumbDownIcon, ThumbUpIcon } from "@/components/icons";
 import * as api from "@/lib/api";
 import { avatarImageUrl } from "@/lib/api";
 import type { Avatar, PromptVariant } from "@/lib/types";
@@ -59,15 +59,19 @@ function VariantCard({
       </div>
 
       <div className="mt-3 flex items-baseline gap-3 border-t border-line pt-3">
-        <span className="text-2xl font-semibold text-ink">{approvalLabel(variant)}</span>
+        <span className="font-display text-2xl font-semibold text-ink">{approvalLabel(variant)}</span>
         <span className="text-sm text-ink-muted">
-          好评率 (approval rate)
+          approval rate
           {variant.times_shown > 0 && ` · ${variant.times_shown} shown`}
         </span>
       </div>
       <div className="mt-1 flex gap-4 text-sm text-ink-muted">
-        <span>👍 {variant.times_positive}</span>
-        <span>👎 {variant.times_negative}</span>
+        <span className="inline-flex items-center gap-1">
+          <ThumbUpIcon className="h-3.5 w-3.5" /> {variant.times_positive}
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <ThumbDownIcon className="h-3.5 w-3.5" /> {variant.times_negative}
+        </span>
       </div>
     </section>
   );
@@ -114,7 +118,7 @@ function NewVariantForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g. More playful tone"
-          className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
+          className="field"
         />
       </div>
       <div className="mb-4">
@@ -126,14 +130,14 @@ function NewVariantForm({
           onChange={(e) => setPromptModifier(e.target.value)}
           rows={4}
           placeholder="Appended to the avatar's system prompt when this variant is chosen..."
-          className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm text-ink focus:border-accent focus:outline-none"
+          className="field"
         />
       </div>
       <div className="flex gap-2">
         <button
           type="submit"
           disabled={creating || !name.trim() || !promptModifier.trim()}
-          className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white transition hover:bg-accent-hover disabled:opacity-50"
+          className="btn-primary py-2"
         >
           {creating ? "Creating..." : "Create variant"}
         </button>
@@ -149,7 +153,7 @@ function NewVariantForm({
   );
 }
 
-function PromptVariantsContent() {
+export default function PromptVariantsPage() {
   const params = useParams<{ avatarId: string }>();
   const avatarId = Number(params.avatarId);
 
@@ -207,10 +211,8 @@ function PromptVariantsContent() {
   const img = avatar ? avatarImageUrl(avatar) : null;
 
   return (
-    <div className="flex h-screen bg-white">
-      <Sidebar activeAvatarId={avatarId} />
-      <main className="flex-1 overflow-y-auto px-8 py-8">
-        <div className="mx-auto max-w-3xl">
+    <PageScroll width="max-w-3xl">
+        <div>
           <div className="mb-1 flex items-center gap-3">
             {avatar &&
               (img ? (
@@ -220,24 +222,30 @@ function PromptVariantsContent() {
                   {avatar.name.slice(0, 1).toUpperCase()}
                 </span>
               ))}
-            <h1 className="text-2xl font-semibold text-ink">
-              Prompt Variants{avatar ? ` — ${avatar.name}` : ""}
-            </h1>
+            <div>
+              <p className="eyebrow">Labs · Prompt experiments</p>
+              <h1 className="font-display text-2xl font-semibold text-ink">{avatar ? avatar.name : "Prompt Variants"}</h1>
+            </div>
           </div>
           <p className="mb-2 text-sm text-ink-muted">
             Try different system-prompt tweaks and let real feedback pick a winner. Every reply is
-            served by one variant, chosen with Thompson Sampling; 👍/👎 on that reply updates its
-            odds of being picked again.
+            served by one variant, chosen with Thompson Sampling; a thumbs-up or thumbs-down on that reply
+            updates its odds of being picked again.
           </p>
           {avatar && (
-            <Link href={`/chat/${avatarId}`} className="mb-6 inline-block text-sm text-accent hover:text-accent-hover">
-              ← Back to chat
-            </Link>
+            <div className="mb-6 flex gap-4 text-sm">
+              <Link href={`/chat/${avatarId}`} className="text-accent hover:text-accent-hover">
+                ← Back to chat
+              </Link>
+              <Link href={`/avatar/${avatarId}/edit`} className="text-accent hover:text-accent-hover">
+                Edit avatar
+              </Link>
+            </div>
           )}
           {!avatar && <div className="mb-6" />}
 
           {error && (
-            <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
+            <div className="mb-4 rounded-lg border border-danger/30 bg-danger/5 px-4 py-2 text-sm text-danger" role="alert">
               {error}
             </div>
           )}
@@ -268,15 +276,6 @@ function PromptVariantsContent() {
             </div>
           )}
         </div>
-      </main>
-    </div>
-  );
-}
-
-export default function PromptVariantsPage() {
-  return (
-    <RequireAuth>
-      <PromptVariantsContent />
-    </RequireAuth>
+    </PageScroll>
   );
 }
