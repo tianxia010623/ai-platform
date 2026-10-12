@@ -98,6 +98,8 @@ async def update_avatar(db: AsyncSession, avatar: Avatar, data: AvatarUpdate) ->
     return avatar
 
 
-async def delete_avatar(db: AsyncSession, avatar: Avatar) -> None:
-    await db.delete(avatar)
+async def set_avatar_image(db: AsyncSession, avatar: Avatar, image_path: str | None) -> Avatar:
+    avatar.image_path = image_path
     await db.commit()
+    await db.refresh(avatar)
+    return avatar
